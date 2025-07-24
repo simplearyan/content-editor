@@ -1,28 +1,39 @@
-// app/api/admin/files/route.ts
+// src/app/api/admin/files/route.ts
 import { NextResponse } from 'next/server';
-import { listMarkdownFiles, getMarkdownFileContent } from '@/lib/github-admin';
+import { getAuthenticatedOctokitWithPAT, GITHUB_REPO_OWNER, GITHUB_REPO_NAME, GITHUB_CONTENT_PATH, GitHubFile } from '@/lib/github-admin';
 
-// GET /api/admin/files - Lists all markdown files
-// GET /api/admin/files?path=<filePath> - Gets content of a specific file
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const filePath = searchParams.get('path');
+    const  octokit  = await getAuthenticatedOctokitWithPAT();
 
-    if (filePath) {
-      // Get single file content
-      const content = await getMarkdownFileContent(filePath);
-      return NextResponse.json({ content });
-    } else {
-      // List all files
-      const files = await listMarkdownFiles();
+    // Get contents of the GITHUB_CONTENT_PATH directory
+    const { data } = await octokit.rest.repos.getContent({
+      owner: GITHUB_REPO_OWNER,
+      repo: GITHUB_REPO_NAME,
+      path: GITHUB_CONTENT_PATH,
+    });
+
+    if (Array.isArray(data)) {
+      const files: GitHubFile[] = data
+        .filter((item: any) => item.type === 'file' && (item.name.endsWith('.md') || item.name.endsWith('.mdx')))
+        .map((item: any) => ({
+          name: item.name,
+          path: item.path, // This is the full path from repo root
+          sha: item.sha,
+          url: item.url,
+          type: item.type,
+          size: item.size,
+          download_url: item.download_url,
+        }));
       return NextResponse.json(files);
     }
+
+    return NextResponse.json([], { status: 200 });
   } catch (error: any) {
-    console.error("API Error (GET /api/admin/files):", error);
-    if (error.cause === 404) {
-      return NextResponse.json({ error: "File not found." }, { status: 404 });
+    console.error("Error listing files:", error);
+    if (error.message.includes("not authenticated") || error.message.includes("access token is missing")) {
+      return NextResponse.json({ error: "Authentication required to list files." }, { status: 401 });
     }
-    return NextResponse.json({ error: "Failed to fetch file(s)." }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Failed to list files." }, { status: 500 });
   }
 }

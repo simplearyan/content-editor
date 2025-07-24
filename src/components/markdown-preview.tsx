@@ -1,0 +1,62 @@
+// src/components/markdown-preview.tsx
+'use client';
+
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex'; // This is a rehype plugin that outputs KaTeX-ready HTML
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { dracula } from 'react-syntax-highlighter/dist/esm/styles/prism'; // Choose a style, e.g., dracula
+
+// IMPORTANT: Ensure you have your mdx-components defined for general markdown elements
+// If you want custom rendering for standard elements (h1, p, a, etc.), define them here
+// This is important because react-markdown's default components are basic HTML
+import mdxComponents from '@/components/mdx-components'; // Re-use your general MDX components
+
+interface MarkdownPreviewProps {
+  markdown: string;
+}
+
+export function MarkdownPreview({ markdown }: MarkdownPreviewProps) {
+  return (
+    <div className="prose dark:prose-invert max-w-none">
+      <ReactMarkdown
+        // Use remark-math for parsing LaTeX syntax
+        remarkPlugins={[remarkMath]}
+        // Use rehype-katex for converting math nodes to KaTeX-compatible HTML
+        rehypePlugins={[rehypeKatex]}
+        // This is crucial: customize how ReactMarkdown renders specific elements
+        components={{
+          // Use your general MDX components for standard elements like h1, p, ul, a etc.
+          ...mdxComponents,
+
+          // Override the default 'code' component for code highlighting
+          code({ node, inline, className, children, ...props }) {
+            const match = /language-(\w+)/.exec(className || '');
+            const language = match ? match[1] : 'text'; // Default to 'text' if no language specified
+
+            return !inline && match ? (
+              <SyntaxHighlighter
+                style={dracula} // Apply the chosen code highlight style
+                language={language}
+                PreTag="div" // Use a div instead of pre for highlighting component
+                {...props}
+              >
+                {String(children).replace(/\n$/, '')}
+              </SyntaxHighlighter>
+            ) : (
+              // For inline code or code without language, render as plain code
+              <code className={className} {...props}>
+                {children}
+              </code>
+            );
+          },
+          // You might need to add specific components for 'math' and 'inlineMath' if rehypeKatex isn't enough
+          // However, rehypeKatex typically transforms these into <span className="katex"> or <div className="katex">
+          // and they should render correctly if KaTeX CSS is loaded.
+        }}
+      >
+        {markdown}
+      </ReactMarkdown>
+    </div>
+  );
+}

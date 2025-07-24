@@ -1,330 +1,384 @@
-// app/editor/page.tsx
-"use client";
+// src/app/admin/editor/page.tsx
+'use client'; // This component must be a Client Component
 
-import { useSession, signOut } from "next-auth/react";
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import dynamic from "next/dynamic";
-// Instead of directly importing react-simplemde-editor
-const SimpleMdeReact = dynamic(() => import("react-simplemde-editor"), { ssr: false });
-import { Options as EasyMDEOptions } from "easymde";
-import "easymde/dist/easymde.min.css"; // Styles for SimpleMDE
+import { useSession, signOut } from 'next-auth/react'; // Import signOut for the logout button
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
-// Re-use your markdown processing pipeline from the blog app
-// For simplicity, we'll put it directly here, but ideally you'd share it.
-import { remark } from 'remark';
-import rehypeReact from 'rehype-react';
-import rehypePrettyCode from 'rehype-pretty-code';
-import rehypeKatex from 'rehype-katex';
-import remarkMath from 'remark-math';
-import remarkGfm from 'remark-gfm';
+// UI Components (assuming shadcn/ui or similar)
+import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input'; // For title/slug input
+import { Label } from '@/components/ui/label'; // For form labels
 
-// Placeholder for custom components if you have them (e.g., Callout)
-const customRehypeReactOptions = {
-  createElement: React.createElement,
-  Fragment: React.Fragment,
-  jsx: React.Children.toArray,
-  jsxs: React.Children.toArray, // These might need adjustment based on your react version
-  // Add your custom components here if they exist in your blog's setup
-  // 'div': ({ className, children, ...props }) => {
-  //   if (className && className.startsWith('callout-')) {
-  //     const type = className.split('-')[1] as 'info' | 'warning' | 'error';
-  //     return <Callout type={type} {...props}>{children}</Callout>;
-  //   }
-  //   return React.createElement('div', props, children);
-  // },
-};
+// Your custom components
+import { MarkdownPreview } from '@/components/markdown-preview'; // For rendering markdown preview
 
-async function processMarkdownToReact(markdownContent: string): Promise<React.ReactNode> {
-  if (!markdownContent) return null;
-  try {
-    const processedContent = await remark()
-      .use(remarkMath)
-      .use(remarkGfm)
-      .use(rehypeKatex)
-      .use(rehypePrettyCode, {
-        theme: 'github-dark', // Match your blog's theme
-      })
-      .use(rehypeReact, customRehypeReactOptions)
-      .process(markdownContent);
-    return processedContent.result as React.ReactNode;
-  } catch (error) {
-    console.error("Error processing markdown for preview:", error);
-    return <p className="text-red-500">Error rendering preview.</p>;
-  }
+// Utility functions (assuming you have these)
+import { slugify } from '@/lib/utils'; // For slugifying titles
+
+// Define the interface for a GitHub file object, matching your API response
+interface GitHubFile {
+  name: string; // e.g., "my-post.mdx"
+  path: string; // e.g., "posts/my-post.mdx" (full path in repo)
+  sha: string; // SHA hash of the file content
+  url: string; // API URL to get the file
+  type: 'file' | 'dir';
+  size: number;
+  download_url: string | null;
 }
 
-
-// Main Editor Component
-export default function EditorPage() {
+// --- Main Editor Component ---
+export default function AdminEditorPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
+
+  // State for content management
+  const [title, setTitle] = useState<string>('');
+  const [slug, setSlug] = useState<string>('');
   const [markdownContent, setMarkdownContent] = useState<string>('');
-  const [previewContent, setPreviewContent] = useState<React.ReactNode>(null);
-  const [fileList, setFileList] = useState<{ name: string; path: string; sha: string; url: string }[]>([]);
-  const [selectedFileName, setSelectedFileName] = useState<string>('');
-  const [selectedFileSha, setSelectedFileSha] = useState<string>(''); // For updates/deletes
-  const [loading, setLoading] = useState<boolean>(true);
-  const [saving, setSaving] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [frontmatter, setFrontmatter] = useState<string>(''); // For manual frontmatter editing
+  const [currentFilePath, setCurrentFilePath] = useState<string | null>(null); // To store the path of the file being edited (for updates/deletes)
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [fileList, setFileList] = useState<GitHubFile[]>([]); // To display existing files for selection
 
-  const isAdmin = session?.user?.isAdmin;
-
-  // Fetch file list on load
-  const fetchFileList = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch('/api/admin/files');
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      setFileList(data);
-    } catch (err: any) {
-      setError(`Failed to load file list: ${err.message}`);
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // --- Authentication and Redirection ---
   useEffect(() => {
-    if (status === "authenticated" && isAdmin) {
-      fetchFileList();
+    if (status === 'unauthenticated') {
+      router.push('/admin'); // Redirect to login page if not authenticated
     }
-  }, [status, isAdmin, fetchFileList]);
+  }, [status, router]);
 
-  // Load selected file content
-  const loadFileContent = useCallback(async (file: { name: string; path: string; sha: string }) => {
-    setLoading(true);
-    setError(null);
-    setSelectedFileName(file.name);
-    setSelectedFileSha(file.sha);
-    try {
-      const response = await fetch(`/api/admin/files?path=${file.path}`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      setMarkdownContent(data.content);
-    } catch (err: any) {
-      setError(`Failed to load file content: ${err.message}`);
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Update preview on markdown content change
+  // --- Fetching Existing Files (Optional, but good for an editor) ---
   useEffect(() => {
-    const renderPreview = async () => {
-      setPreviewContent(await processMarkdownToReact(markdownContent));
+    // Function to fetch existing markdown files from GitHub
+    const fetchFiles = async () => {
+      try {
+        // You'll need an API route in your app to list files from GitHub
+        // This is a conceptual endpoint. You'd create `/api/admin/files` that
+        // uses your github-admin.ts to list contents of GITHUB_CONTENT_PATH.
+        const res = await fetch('/api/admin/files');
+        if (!res.ok) {
+          throw new Error(`Failed to fetch file list: ${res.statusText}`);
+        }
+        const files : GitHubFile[] = await res.json();
+        setFileList(files); // Assuming 'files' is an array of file paths relative to content root
+      } catch (error) {
+        console.error("Error fetching file list:", error);
+        alert("Failed to load existing files. Please check console for details.");
+      }
     };
-    renderPreview();
-  }, [markdownContent]);
 
+    if (status === 'authenticated') {
+      fetchFiles();
+    }
+  }, [status]);
 
+  // --- Handle File Selection for Editing ---
+  const handleFileSelect = async (filePath: string) => {
+    try {
+      // You'll need an API route to fetch a single file's content
+      // e.g., `/api/admin/file?path=some/file.md`
+      const res = await fetch(`/api/admin/file?path=${encodeURIComponent(filePath)}`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch file content: ${res.statusText}`);
+      }
+      const data = await res.json();
+      // Assuming data contains { content: "---frontmatter---\nmarkdown content", sha: "..." }
+      const { content, sha } = data;
+
+      // Parse frontmatter and markdown content
+      const parts = content.split('---');
+      if (parts.length >= 3) {
+        setFrontmatter(parts[1].trim()); // First '---' to second '---' is frontmatter
+        setMarkdownContent(parts.slice(2).join('---').trim()); // Rest is markdown
+      } else {
+        // No frontmatter, just markdown
+        setFrontmatter('');
+        setMarkdownContent(content.trim());
+      }
+
+      // Extract title from frontmatter (simple regex for demonstration)
+      const titleMatch = parts[1]?.match(/title:\s*(.*)/);
+      if (titleMatch && titleMatch[1]) {
+        setTitle(titleMatch[1].trim());
+        setSlug(slugify(titleMatch[1].trim(), new Set())); // Auto-generate slug
+      } else {
+        setTitle('');
+        setSlug('');
+      }
+
+      setCurrentFilePath(filePath); // Store the path for updates
+      alert(`Loaded file: ${filePath}`);
+    } catch (error) {
+      console.error("Error loading file:", error);
+      alert(`Failed to load file: ${error || 'Unknown error'}`);
+    }
+  };
+
+  // --- Handle Title Change (and auto-slugify) ---
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTitle = e.target.value;
+    setTitle(newTitle);
+    setSlug(slugify(newTitle, new Set())); // Auto-generate slug
+  };
+
+  // --- Handle Save/Update ---
   const handleSave = async () => {
-    if (!selectedFileName || !markdownContent) {
-      setError("Cannot save: No file selected or content is empty.");
-      return;
-    }
-
-    setSaving(true);
-    setError(null);
+    setIsSaving(true);
     try {
-      const response = await fetch('/api/admin/save', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      if (!title || !markdownContent) {
+        alert("Title and content cannot be empty.");                                    
+        setIsSaving(false);
+        return;
+      }
+
+      const finalSlug = slug || slugify(title, new Set()); // Ensure slug is present
+      const filePath = `posts/${finalSlug}.mdx`; // Example: all content goes into 'posts' directory as .mdx
+
+      // Construct frontmatter (you might want a more robust YAML parser)
+      const generatedFrontmatter = `---
+title: ${title}
+slug: ${finalSlug}
+date: ${new Date().toISOString().split('T')[0]} # YYYY-MM-DD
+${frontmatter} # Include manually edited frontmatter, if any
+---`;
+
+      const fullContent = `${generatedFrontmatter}\n${markdownContent}`;
+
+      // Call your API route to save/update the file
+      const res = await fetch('/api/admin/save', {
+        method: 'POST', // Or 'PUT' if you prefer for updates
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          filename: selectedFileName,
-          content: markdownContent,
-          sha: selectedFileSha, // Pass SHA for updates
+          filePath: filePath,
+          content: fullContent,
+          commitMessage: currentFilePath ? `Update: ${title}` : `Create: ${title}`,
+          // You might need to pass the SHA for updates if your save API requires it for concurrency control
+          // sha: currentFileSha,
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Save failed: ${errorData.error || response.statusText}`);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || `Failed to save content: ${res.statusText}`);
       }
 
-      const result = await response.json();
-      setSelectedFileSha(result.result.content.sha); // Update SHA after successful save
-      await fetchFileList(); // Refresh file list to show any changes
-      alert('File saved successfully!');
-    } catch (err: any) {
-      setError(`Error saving file: ${err.message}`);
-      console.error(err);
+      alert(`Content saved successfully! File: ${filePath}`);
+      // Optionally clear form or refresh file list
+      // setTitle('');
+      // setSlug('');
+      // setMarkdownContent('');
+      // setFrontmatter('');
+      // setCurrentFilePath(null);
+      // fetchFiles(); // Refresh list after save
+    } catch (error: any) {
+      console.error("Error saving content:", error);
+      alert(`Failed to save content: ${error || 'Unknown error'}`);
     } finally {
-      setSaving(false);
+      setIsSaving(false);
     }
   };
 
+  // --- Handle Delete (Optional) ---
   const handleDelete = async () => {
-    if (!selectedFileName || !selectedFileSha) {
-      setError("Cannot delete: No file selected or missing SHA.");
+    if (!currentFilePath || !confirm(`Are you sure you want to delete "${currentFilePath}"?`)) {
       return;
     }
 
-    if (!confirm(`Are you sure you want to delete "${selectedFileName}"? This action cannot be undone.`)) {
-      return;
-    }
-
-    setSaving(true);
-    setError(null);
+    setIsDeleting(true);
     try {
-      const response = await fetch('/api/admin/delete', {
+      const res = await fetch('/api/admin/delete', {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          filename: selectedFileName,
-          sha: selectedFileSha, // SHA is required for deletes
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath: currentFilePath }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Delete failed: ${errorData.error || response.statusText}`);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || `Failed to delete content: ${res.statusText}`);
       }
 
-      await response.json();
+      alert(`Content deleted successfully! File: ${currentFilePath}`);
+      // Clear form and refresh file list
+      setTitle('');
+      setSlug('');
       setMarkdownContent('');
-      setSelectedFileName('');
-      setSelectedFileSha('');
-      await fetchFileList(); // Refresh file list
-      alert('File deleted successfully!');
-    } catch (err: any) {
-      setError(`Error deleting file: ${err.message}`);
-      console.error(err);
+      setFrontmatter('');
+      setCurrentFilePath(null);
+      // fetchFiles(); // Refresh list after delete
+    } catch (error: any) {
+      console.error("Error deleting content:", error);
+      alert(`Failed to delete content: ${error || 'Unknown error'}`);
     } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleNewFile = () => {
-    let newFileName = prompt("Enter new markdown filename (e.g., my-new-post.md):");
-    if (newFileName && !newFileName.endsWith('.md') && !newFileName.endsWith('.mdx')) {
-      newFileName += '.md'; // Default to .md if no extension provided
-    }
-    if (newFileName) {
-      setMarkdownContent('---\ntitle: New Post\ndescription: A new post\ndate: ' + new Date().toISOString().split('T')[0] + '\nauthor: Your Name\ntags: [new]\n---\n\n# New Blog Post\n\nStart writing your Markdown content here.');
-      setSelectedFileName(newFileName);
-      setSelectedFileSha(''); // No SHA for new file
+      setIsDeleting(false);
     }
   };
 
 
-  const simpleMdeOptions = useMemo(() => {
-    return {
-      spellChecker: false,
-      autofocus: true,
-      // Add custom EasyMDE toolbar buttons if needed
-      // toolbar: ["bold", "italic", "heading", "|", "quote", "unordered-list", "ordered-list", "|", "link", "image", "|", "guide"],
-    } as EasyMDEOptions;
-  }, []);
-
-
-  if (status === "loading") {
-    return <div className="flex justify-center items-center min-h-screen text-gray-800 dark:text-gray-200">Loading authentication...</div>;
-  }
-
-  if (status === "unauthenticated" || !isAdmin) {
+  // --- Render Loading State ---
+  if (status === 'loading') {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
-        <h1 className="text-3xl font-bold text-red-600 dark:text-red-400 mb-4">Access Denied</h1>
-        <p className="text-gray-700 dark:text-gray-300 mb-6">You are not authorized to view this page. Please sign in with an admin GitHub account.</p>
-        <button
-          onClick={() => signOut({ callbackUrl: '/login' })}
-          className="px-6 py-3 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors duration-200"
-        >
-          Sign Out
-        </button>
+      <div className="flex items-center justify-center min-h-screen">
+        <Skeleton className="h-[200px] w-[300px] rounded-xl" />
+        <div className="mt-4 space-y-2">
+          <Skeleton className="h-4 w-[250px]" />
+          <Skeleton className="h-4 w-[200px]" />
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
-      {/* Sidebar for file selection */}
-      <aside className="w-64 bg-gray-200 dark:bg-gray-800 p-4 flex flex-col">
-        <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Files</h2>
-        <button
-          onClick={handleNewFile}
-          className="w-full mb-4 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors duration-200"
-        >
-          + New File
-        </button>
-        {loading && <p className="text-gray-600 dark:text-gray-400">Loading files...</p>}
-        {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
-        <ul className="flex-grow overflow-y-auto">
-          {fileList.length === 0 && !loading && <p className="text-gray-600 dark:text-gray-400 text-sm">No files found.</p>}
-          {fileList.map((file) => (
-            <li key={file.path} className="mb-2">
-              <button
-                onClick={() => loadFileContent(file)}
-                className={`w-full text-left p-2 rounded hover:bg-blue-200 dark:hover:bg-blue-700 transition-colors duration-200 ${
-                  selectedFileName === file.name ? 'bg-blue-300 dark:bg-blue-600 text-white' : 'bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-gray-100'
-                }`}
-              >
-                {file.name}
-              </button>
-            </li>
-          ))}
-        </ul>
-        <button
-          onClick={() => signOut({ callbackUrl: '/' })}
-          className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors duration-200"
-        >
-          Sign Out
-        </button>
-      </aside>
-
-      {/* Main editor and preview area */}
-      <main className="flex-grow flex flex-col p-4">
-        <h1 className="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-100">
-          Editing: {selectedFileName || "Select or Create a File"}
-        </h1>
-
-        <div className="flex space-x-4 mb-4">
-          <button
-            onClick={handleSave}
-            disabled={!selectedFileName || saving}
-            className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition-colors duration-200"
-          >
-            {saving ? 'Saving...' : 'Save'}
-          </button>
-          <button
-            onClick={handleDelete}
-            disabled={!selectedFileName || saving || !selectedFileSha}
-            className="px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 transition-colors duration-200"
-          >
-            {saving ? 'Deleting...' : 'Delete'}
-          </button>
-          {error && <p className="text-red-500 text-sm self-center ml-auto">{error}</p>}
+  // --- Render Editor if Authenticated ---
+  if (session) {
+    return (
+      <div className="p-8">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">Welcome to the Admin Editor, {session.user?.name || 'Admin'}!</h1>
+          <div className="flex items-center space-x-4">
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              Signed in via {session.provider} (
+              {session.user?.email ? session.user.email : session.user?.githubUsername})
+            </span>
+            <Button onClick={() => signOut()} variant="outline">
+              Sign Out
+            </Button>
+          </div>
         </div>
 
-        <div className="flex-grow grid grid-cols-2 gap-4">
-          {/* Markdown Editor */}
-          <div className="flex flex-col bg-white dark:bg-gray-800 rounded shadow overflow-hidden">
-            <SimpleMdeReact
-              value={markdownContent}
-              onChange={setMarkdownContent}
-              options={simpleMdeOptions}
-            />
-          </div>
+        {/* File Management / New File Section */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Manage Content</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Create New File */}
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Create New Content</h3>
+                <Button
+                  onClick={() => {
+                    setTitle('');
+                    setSlug('');
+                    setMarkdownContent('');
+                    setFrontmatter('');
+                    setCurrentFilePath(null);
+                    alert("New content file created. Start writing!");
+                  }}
+                  className="w-full"
+                >
+                  New Empty File
+                </Button>
+              </div>
 
-          {/* Markdown Preview */}
-          <div className="flex flex-col bg-white dark:bg-gray-800 rounded shadow overflow-y-auto p-4">
-            <h3 className="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-100">Preview</h3>
-            <div className="prose dark:prose-invert max-w-none">
-              {previewContent}
+              {/* Load Existing File */}
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Load Existing Content</h3>
+                <div className="max-h-48 overflow-y-auto border rounded-md p-2 bg-gray-100 dark:bg-gray-800">
+                  {fileList.length > 0 ? (
+                    <ul className="space-y-1">
+                      {fileList.map((file) => (
+                        <li key={file.path}>
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start h-auto py-1 px-2 text-sm"
+                            onClick={() => handleFileSelect(file.path)}
+                          >
+                            {file.name}
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-center text-sm text-gray-500">No existing files found.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Editor Area */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Input Section */}
+          <div>
+            <h2 className="text-xl font-semibold mb-3">Content Details</h2>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="title">Title</Label>
+                <Input
+                  id="title"
+                  placeholder="Enter content title"
+                  value={title}
+                  onChange={handleTitleChange}
+                />
+              </div>
+              <div>
+                <Label htmlFor="slug">Slug (Auto-generated)</Label>
+                <Input
+                  id="slug"
+                  placeholder="content-slug"
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value)} // Allow manual override
+                  disabled={!title} // Disable if no title
+                />
+              </div>
+              <div>
+                <Label htmlFor="frontmatter">Frontmatter (YAML)</Label>
+                <Textarea
+                  id="frontmatter"
+                  placeholder={`date: ${new Date().toISOString().split('T')[0]}\ndescription: Your content description`}
+                  value={frontmatter}
+                  onChange={(e) => setFrontmatter(e.target.value)}
+                  className="min-h-[100px] font-mono text-xs"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Add additional YAML frontmatter here (e.g., tags, categories).
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="markdownContent">Markdown Content</Label>
+                <Textarea
+                  id="markdownContent"
+                  className="min-h-[400px] font-mono"
+                  placeholder="Start writing your Markdown content here..."
+                  value={markdownContent}
+                  onChange={(e) => setMarkdownContent(e.target.value)}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Supports LaTeX with $...$ and $$...$$, and code highlighting.
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 flex space-x-4">
+              <Button onClick={handleSave} disabled={isSaving || !title || !markdownContent}>
+                {isSaving ? 'Saving...' : 'Save Content'}
+              </Button>
+              {currentFilePath && (
+                <Button onClick={handleDelete} disabled={isDeleting} variant="destructive">
+                  {isDeleting ? 'Deleting...' : 'Delete Content'}
+                </Button>
+              )}
             </div>
           </div>
+
+          {/* Preview Section */}
+          <div>
+            <h2 className="text-xl font-semibold mb-3">Preview</h2>
+            <Card className="min-h-[700px] overflow-auto">
+              <CardContent className="p-4">
+                <MarkdownPreview markdown={markdownContent} />
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </main>
-    </div>
-  );
+      </div>
+    );
+  }
+
+  // Fallback for unauthenticated state (should be covered by useEffect redirect)
+  return null;
 }

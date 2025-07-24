@@ -1,24 +1,35 @@
-// app/api/admin/save/route.ts
+// src/app/api/admin/save/route.ts
 import { NextResponse } from 'next/server';
-import { saveMarkdownFile } from '@/lib/github-admin';
-import { GITHUB_CONTENT_PATH } from '@/lib/github-admin'; // Ensure GITHUB_CONTENT_PATH is exported from github-admin
+import { saveGitHubFile, getGitHubFileContent } from '@/lib/github-admin';
 
 export async function POST(request: Request) {
   try {
-    const { filename, content, sha } = await request.json(); // sha is for updates
+    const { filePath, content, commitMessage } = await request.json();
 
-    if (!filename || !content) {
-      return NextResponse.json({ error: "Filename and content are required." }, { status: 400 });
+    if (!filePath || !content || !commitMessage) {
+      return NextResponse.json({ error: "File path, content, and commit message are required." }, { status: 400 });
     }
 
-    const filePath = `${GITHUB_CONTENT_PATH}/${filename}`;
-    const commitMessage = sha ? `Update ${filename}` : `Create ${filename}`;
+    let existingSha: string | undefined = undefined;
+    try {
+      // Try to get the SHA of the existing file for updates
+      const existingFile = await getGitHubFileContent(filePath);
+      existingSha = existingFile.sha;
+    } catch (error: any) {
+      // If file not found (404), it's a new file, so no SHA needed.
+      if (!error.message.includes("not found")) {
+        console.warn(`Could not get SHA for ${filePath} (likely new file), but encountered other error:`, error);
+      }
+    }
 
-    const result = await saveMarkdownFile(filePath, content, commitMessage, sha);
+    const result = await saveGitHubFile(filePath, content, commitMessage, existingSha);
 
-    return NextResponse.json({ success: true, result });
+    return NextResponse.json({ success: true, ...result }, { status: 200 });
   } catch (error: any) {
-    console.error("API Error (POST /api/admin/save):", error);
-    return NextResponse.json({ error: "Failed to save file." }, { status: 500 });
+    console.error(`Error saving file via API:`, error);
+    if (error.message.includes("not authenticated") || error.message.includes("access token is missing")) {
+      return NextResponse.json({ error: "Authentication required to save files." }, { status: 401 });
+    }
+    return NextResponse.json({ error: error.message || "Failed to save file." }, { status: 500 });
   }
 }

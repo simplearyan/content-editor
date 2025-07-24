@@ -1,6 +1,3 @@
-import NextAuth from "next-auth";
-import { authOptions } from "./options"; // import from your new file
-
-const handler = NextAuth(authOptions);
-
-export { handler as GET, handler as POST };
+// src/app/api/auth/[...nextauth]/route.ts
+// This file is now very simple due to Auth.js v5's structure
+export { GET, POST } from "@/auth"; // Make sure this line exists and is correct!
