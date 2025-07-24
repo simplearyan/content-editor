@@ -3,7 +3,10 @@
 
 import { useSession, signOut } from "next-auth/react";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import SimpleMdeReact from "react-simplemde-editor";
+import dynamic from "next/dynamic";
+// Instead of directly importing react-simplemde-editor
+const SimpleMdeReact = dynamic(() => import("react-simplemde-editor"), { ssr: false });
+import { Options as EasyMDEOptions } from "easymde";
 import "easymde/dist/easymde.min.css"; // Styles for SimpleMDE
 
 // Re-use your markdown processing pipeline from the blog app
@@ -220,7 +223,7 @@ export default function EditorPage() {
       autofocus: true,
       // Add custom EasyMDE toolbar buttons if needed
       // toolbar: ["bold", "italic", "heading", "|", "quote", "unordered-list", "ordered-list", "|", "link", "image", "|", "guide"],
-    } as SimpleMdeReact.Options;
+    } as EasyMDEOptions;
   }, []);
 
 

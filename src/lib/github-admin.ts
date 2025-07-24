@@ -4,7 +4,7 @@ import { Buffer } from 'buffer'; // Node.js Buffer is available in Next.js API r
 
 const GITHUB_REPO_OWNER = process.env.GITHUB_REPO_OWNER as string;
 const GITHUB_REPO_NAME = process.env.GITHUB_REPO_NAME as string;
-const GITHUB_CONTENT_PATH = process.env.GITHUB_CONTENT_PATH as string;
+export const GITHUB_CONTENT_PATH = process.env.GITHUB_CONTENT_PATH as string;
 const GITHUB_BRANCH = process.env.GITHUB_BRANCH as string;
 const GITHUB_WRITE_TOKEN = process.env.GITHUB_WRITE_TOKEN as string;
 
