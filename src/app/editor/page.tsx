@@ -44,6 +44,7 @@ export default function AdminEditorPage() {
   const [parsedFrontmatterData, setParsedFrontmatterData] = useState<Record<string, any>>({});
   const [frontmatter, setFrontmatter] = useState<string>(''); // For manual frontmatter editing
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null); // To store the path of the file being edited (for updates/deletes)
+  const [currentFileSha, setCurrentFileSha] = useState<string | undefined>(undefined); // To send SHA for updates
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [fileList, setFileList] = useState<GitHubFile[]>([]); // To display existing files for selection
@@ -56,25 +57,46 @@ export default function AdminEditorPage() {
   }, [status, router]);
 
   // --- Fetching Existing Files (Optional, but good for an editor) ---
-  useEffect(() => {
-    // Function to fetch existing markdown files from GitHub
-    const fetchFiles = async () => {
-      try {
-        // You'll need an API route in your app to list files from GitHub
-        // This is a conceptual endpoint. You'd create `/api/admin/files` that
-        // uses your github-admin.ts to list contents of GITHUB_CONTENT_PATH.
-        const res = await fetch('/api/admin/files');
-        if (!res.ok) {
-          throw new Error(`Failed to fetch file list: ${res.statusText}`);
-        }
-        const files : GitHubFile[] = await res.json();
-        setFileList(files); // Assuming 'files' is an array of file paths relative to content root
-      } catch (error) {
-        console.error("Error fetching file list:", error);
-        alert("Failed to load existing files. Please check console for details.");
-      }
-    };
+  // useEffect(() => {
+  //   // Function to fetch existing markdown files from GitHub
+  //   const fetchFiles = async () => {
+  //     try {
+  //       // You'll need an API route in your app to list files from GitHub
+  //       // This is a conceptual endpoint. You'd create `/api/admin/files` that
+  //       // uses your github-admin.ts to list contents of GITHUB_CONTENT_PATH.
+  //       const res = await fetch('/api/admin/files');
+  //       if (!res.ok) {
+  //         throw new Error(`Failed to fetch file list: ${res.statusText}`);
+  //       }
+  //       const files : GitHubFile[] = await res.json();
+  //       setFileList(files); // Assuming 'files' is an array of file paths relative to content root
+  //     } catch (error) {
+  //       console.error("Error fetching file list:", error);
+  //       alert("Failed to load existing files. Please check console for details.");
+  //     }
+  //   };
 
+  //   if (status === 'authenticated') {
+  //     fetchFiles();
+  //   }
+  // }, [status]);
+
+    // --- Fetching Existing Files ---
+  const fetchFiles = async () => {
+    try {
+      const res = await fetch('/api/admin/files');
+      if (!res.ok) {
+        throw new Error(`Failed to fetch file list: ${res.statusText}`);
+      }
+      const files: GitHubFile[] = await res.json();
+      setFileList(files.filter(file => file.type === 'file' && (file.name.endsWith('.md') || file.name.endsWith('.mdx'))));
+    } catch (error) {
+      console.error("Error fetching file list:", error);
+      alert("Failed to load existing files. Please check console for details.");
+    }
+  };
+
+  useEffect(() => {
     if (status === 'authenticated') {
       fetchFiles();
     }
@@ -92,6 +114,19 @@ export default function AdminEditorPage() {
       const data = await res.json();
       // Assuming data contains { content: "---frontmatter---\nmarkdown content", sha: "..." }
       const { content, sha } = data;
+
+            // Use gray-matter to parse the content
+      // const { data: parsedData, content: markdownBody } = matter(rawContent);
+
+      // Set states based on parsed data
+      // setParsedFrontmatterData(parsedData); // Store the full parsed frontmatter object
+      // setTitle(parsedData.title || '');
+      // setSlug(parsedData.slug || slugify(parsedData.title || '', new Set())); // Use existing slug or generate
+      // setMarkdownContent(markdownBody); // This is just the markdown content, no frontmatter
+      // setCurrentFilePath(filePath);
+      setCurrentFileSha(sha); // Store SHA for updates
+
+      // alert(`Loaded file: ${filePath}`);
 
       // Parse frontmatter and markdown content
       const parts = content.split('---');
@@ -127,6 +162,21 @@ export default function AdminEditorPage() {
     const newTitle = e.target.value;
     setTitle(newTitle);
     setSlug(slugify(newTitle, new Set())); // Auto-generate slug
+        // Update title in parsedFrontmatterData as well for consistency
+    // setParsedFrontmatterData(prev => ({ ...prev, title: newTitle }));
+  };
+
+  // --- Handle Slug Change (manual override) ---
+  const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newSlug = e.target.value;
+    setSlug(newSlug);
+    // Update slug in parsedFrontmatterData
+    setParsedFrontmatterData(prev => ({ ...prev, slug: newSlug }));
+  };
+
+  // --- Handle Markdown Content Change ---
+  const handleMarkdownContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setMarkdownContent(e.target.value);
   };
 
   // --- Handle Save/Update ---
@@ -141,6 +191,11 @@ export default function AdminEditorPage() {
 
       const finalSlug = slug || slugify(title, new Set()); // Ensure slug is present
       const filePath = `posts/${finalSlug}.mdx`; // Example: all content goes into 'posts' directory as .mdx
+
+      // Define the target file path in the GitHub repository
+      // If currentFilePath exists, it's an update; otherwise, it's a new file.
+      // Use .mdx by default for new files.
+      const filePathToSave = currentFilePath || `posts/${finalSlug}.mdx`;
 
       // Construct the final front matter object
       const finalFrontmatterData = {
@@ -165,10 +220,11 @@ export default function AdminEditorPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           filePath: filePath,
+          // filePath: filePathToSave, // Use the path to save
           content: fullContent,
           commitMessage: currentFilePath ? `Update: ${title}` : `Create: ${title}`,
           // You might need to pass the SHA for updates if your save API requires it for concurrency control
-          // sha: currentFileSha,
+          sha: currentFileSha,
         }),
       });
 
@@ -177,14 +233,14 @@ export default function AdminEditorPage() {
         throw new Error(errorData.error || `Failed to save content: ${res.statusText}`);
       }
 
-      alert(`Content saved successfully! File: ${filePath}`);
+      alert(`Content saved successfully! File: ${filePath} (${currentFilePath ? 'updated' : 'created'})`);
       // Optionally clear form or refresh file list
       // setTitle('');
       // setSlug('');
       // setMarkdownContent('');
       // setFrontmatter('');
       // setCurrentFilePath(null);
-      // fetchFiles(); // Refresh list after save
+      fetchFiles(); // Refresh list after save
     } catch (error: any) {
       console.error("Error saving content:", error);
       alert(`Failed to save content: ${error || 'Unknown error'}`);
@@ -195,7 +251,7 @@ export default function AdminEditorPage() {
 
   // --- Handle Delete (Optional) ---
   const handleDelete = async () => {
-    if (!currentFilePath || !confirm(`Are you sure you want to delete "${currentFilePath}"?`)) {
+    if (!currentFilePath || !currentFileSha || !confirm(`Are you sure you want to delete "${currentFilePath}"?`)) {
       return;
     }
 
@@ -204,7 +260,7 @@ export default function AdminEditorPage() {
       const res = await fetch('/api/admin/delete', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filePath: currentFilePath }),
+        body: JSON.stringify({ filePath: currentFilePath, sha: currentFileSha }), // Pass SHA for delete
       });
 
       if (!res.ok) {
@@ -219,7 +275,7 @@ export default function AdminEditorPage() {
       setMarkdownContent('');
       setFrontmatter('');
       setCurrentFilePath(null);
-      // fetchFiles(); // Refresh list after delete
+      fetchFiles(); // Refresh list after delete
     } catch (error: any) {
       console.error("Error deleting content:", error);
       alert(`Failed to delete content: ${error || 'Unknown error'}`);
