@@ -1,7 +1,7 @@
-import NextAuth from "next-auth"; // For Auth.js v5, you still import from "next-auth"
+import NextAuth, { DefaultSession } from "next-auth"; // For Auth.js v5, you still import from "next-auth"
 import GitHub from "next-auth/providers/github"
 import Google from "next-auth/providers/google"
-import type { NextAuthOptions } from "next-auth"; // New type for configuration
+// import type { NextAuthOptions } from "next-auth"; // New type for configuration
 
 interface GitHubProfile {
   id: number | string;
@@ -23,7 +23,7 @@ const ADMIN_GITHUB_USERNAMES: string[] = process.env.ADMIN_GITHUB_USERNAMES
   : [];
 
 // Define your authentication configuration
-export const authConfig: NextAuthOptions = {
+export const authConfig = {
   // Use `pages` to redirect to your custom sign-in/error pages
   pages: {
     signIn: '/admin', // Redirects to this page if not authenticated
@@ -126,7 +126,7 @@ export const authConfig: NextAuthOptions = {
     strategy: "jwt",
   },
   debug: process.env.NODE_ENV === 'development',
-} satisfies NextAuthOptions; // Use satisfies to ensure it conforms to NextAuthConfig
+} satisfies Parameters<typeof NextAuth>[0]; // Use satisfies to ensure it conforms to NextAuthConfig
 
 // This is the crucial part for Auth.js v5:
 // NextAuth returns an object with `handlers`, `auth`, `signIn`, `signOut`.
@@ -140,7 +140,7 @@ declare module "next-auth" {
   interface Session {
     accessToken?: string;
     provider?: string;
-    user?: {
+    user: DefaultSession["user"] & {
       name?: string | null;
       email?: string | null;
       image?: string | null;

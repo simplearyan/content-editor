@@ -4,6 +4,7 @@
 import { useSession, signOut } from 'next-auth/react'; // Import signOut for the logout button
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import matter from 'gray-matter'; // Import gray-matter
 
 // UI Components (assuming shadcn/ui or similar)
 import { Skeleton } from '@/components/ui/skeleton';
@@ -38,7 +39,9 @@ export default function AdminEditorPage() {
   // State for content management
   const [title, setTitle] = useState<string>('');
   const [slug, setSlug] = useState<string>('');
-  const [markdownContent, setMarkdownContent] = useState<string>('');
+  const [markdownContent, setMarkdownContent] = useState<string>(''); // This is now JUST the markdown body
+  // New state to hold all parsed front matter as an object
+  const [parsedFrontmatterData, setParsedFrontmatterData] = useState<Record<string, any>>({});
   const [frontmatter, setFrontmatter] = useState<string>(''); // For manual frontmatter editing
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null); // To store the path of the file being edited (for updates/deletes)
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -139,15 +142,22 @@ export default function AdminEditorPage() {
       const finalSlug = slug || slugify(title, new Set()); // Ensure slug is present
       const filePath = `posts/${finalSlug}.mdx`; // Example: all content goes into 'posts' directory as .mdx
 
-      // Construct frontmatter (you might want a more robust YAML parser)
-      const generatedFrontmatter = `---
-title: ${title}
-slug: ${finalSlug}
-date: ${new Date().toISOString().split('T')[0]} # YYYY-MM-DD
-${frontmatter} # Include manually edited frontmatter, if any
----`;
+      // Construct the final front matter object
+      const finalFrontmatterData = {
+        ...parsedFrontmatterData, // Start with any existing parsed front matter
+        title: title,             // Override with current title input
+        slug: finalSlug,          // Override with current slug input
+        // Ensure date is always present and updated
+        date: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
+      };
 
-      const fullContent = `${generatedFrontmatter}\n${markdownContent}`;
+      // Use gray-matter's stringify to combine front matter and content
+      const fullContent = matter.stringify(markdownContent, finalFrontmatterData);
+
+      // Log for debugging
+      console.log("--- Final Content to be Saved ---");
+      console.log(fullContent);
+      console.log("---------------------------------");
 
       // Call your API route to save/update the file
       const res = await fetch('/api/admin/save', {

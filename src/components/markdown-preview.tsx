@@ -1,11 +1,14 @@
 // src/components/markdown-preview.tsx
 'use client';
 
+import type * as React from "react";
+import type { ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex'; // This is a rehype plugin that outputs KaTeX-ready HTML
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { dracula } from 'react-syntax-highlighter/dist/esm/styles/prism'; // Choose a style, e.g., dracula
+import type { ExtraProps } from 'react-markdown';
 
 // IMPORTANT: Ensure you have your mdx-components defined for general markdown elements
 // If you want custom rendering for standard elements (h1, p, a, etc.), define them here
@@ -14,6 +17,23 @@ import mdxComponents from '@/components/mdx-components'; // Re-use your general 
 
 interface MarkdownPreviewProps {
   markdown: string;
+}
+
+interface CodeComponentProps {
+  node?: any;
+  inline?: boolean;
+  className?: string;
+  children: React.ReactNode;
+  [key: string]: any;
+}
+
+// Minimal interface for the Code component's props from react-markdown
+interface MarkdownCodeProps {
+  node?: any;                // mdast node, usually you can keep as any
+  inline?: boolean;          // whether code is inline or block
+  className?: string;
+  children: ReactNode;       // children nodes
+  [key: string]: any;        // allow other props (e.g., style, onClick, etc)
 }
 
 export function MarkdownPreview({ markdown }: MarkdownPreviewProps) {
@@ -30,7 +50,8 @@ export function MarkdownPreview({ markdown }: MarkdownPreviewProps) {
           ...mdxComponents,
 
           // Override the default 'code' component for code highlighting
-          code({ node, inline, className, children, ...props }) {
+          code(props: React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & ExtraProps) {
+            const { node, inline, className, children, ...rest } = props;
             const match = /language-(\w+)/.exec(className || '');
             const language = match ? match[1] : 'text'; // Default to 'text' if no language specified
 
