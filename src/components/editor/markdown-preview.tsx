@@ -13,7 +13,7 @@ import { dracula } from 'react-syntax-highlighter/dist/esm/styles/prism'; // Cho
 // IMPORTANT: Ensure you have your mdx-components defined for general markdown elements
 // If you want custom rendering for standard elements (h1, p, a, etc.), define them here
 // This is important because react-markdown's default components are basic HTML
-import mdxComponents from '@/components/mdx-components'; // Re-use your general MDX components
+import mdxComponents from '@/components/editor/mdx-components'; // Re-use your general MDX components
 
 interface MarkdownPreviewProps {
   markdown: string;

@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label'; // For form labels
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 // Your custom components
-import { MarkdownPreview } from '@/components/markdown-preview'; // For rendering markdown preview
+import { MarkdownPreview } from '@/components/editor/markdown-preview'; // For rendering markdown preview
 
 // Utility functions (assuming you have these)
 import { slugify } from '@/lib/utils'; // For slugifying titles
@@ -353,7 +353,7 @@ export default function AdminEditorPage() {
   if (session) {
     return (
       <div className="p-8">
-        <div className="flex justify-between items-center mb-6">
+        {/* <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Welcome to the Admin Editor, {session.user?.name || 'Admin'}!</h1>
           <div className="flex items-center space-x-4">
             <span className="text-sm text-gray-600 dark:text-gray-400">
@@ -364,7 +364,7 @@ export default function AdminEditorPage() {
               Sign Out
             </Button>
           </div>
-        </div>
+        </div> */}
 
         {/* File Management / New File Section */}
         <Card className="mb-6">
