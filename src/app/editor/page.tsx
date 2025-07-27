@@ -352,7 +352,7 @@ export default function AdminEditorPage() {
   // --- Render Editor if Authenticated ---
   if (session) {
     return (
-      <div className="p-8">
+      <div>
         {/* <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Welcome to the Admin Editor, {session.user?.name || 'Admin'}!</h1>
           <div className="flex items-center space-x-4">

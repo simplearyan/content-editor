@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider";
-import { SessionProvider } from "next-auth/react"; // This import is still from "next-auth/react"
+import { ThemeProvider } from "@/components/theme-provider"
+import { SessionProvider } from 'next-auth/react'; // This import is still from "next-auth/react"
 import Layout from "@/components/layout/layout";
 
 const geistSans = Geist({
@@ -30,11 +30,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <SessionProvider>
-            <Layout>{children}</Layout>
-          </SessionProvider>
-        </ThemeProvider>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <SessionProvider>
+        <Layout>{children}</Layout>
+        </SessionProvider>
+      </ThemeProvider>
       </body>
     </html>
   );

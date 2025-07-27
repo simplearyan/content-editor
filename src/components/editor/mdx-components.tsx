@@ -170,36 +170,36 @@ const components = {
   //   />
   // ),
 
-    img: ({ className, alt, src, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => {
-      const imgSrc = src as string;
-    if (!imgSrc) {
-      // Handle case where src might be missing (though unlikely for img)
-      console.warn("Image component received no src.");
-      return null; // Or render a fallback element
-    }
+  //   img: ({ className, alt, src, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => {
+  //     const imgSrc = src as string;
+  //   if (!imgSrc) {
+  //     // Handle case where src might be missing (though unlikely for img)
+  //     console.warn("Image component received no src.");
+  //     return null; // Or render a fallback element
+  //   }
 
-    const useFill = true; // Or you could make this conditional based on your needs
+  //   const useFill = true; // Or you could make this conditional based on your needs
 
-    // If 'fill' is true, do not pass 'width' and 'height'
-    // If 'fill' is false, you WOULD need to pass valid 'width' and 'height'
-    // For simplicity, assuming 'fill' is always true here as per your original code.
-       // Filter out width and height from 'props' if 'fill' is true.
-    // This creates a new object 'remainingProps' that explicitly does NOT have 'width' or 'height'.
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { width: _width, height: _height, ...remainingProps } = props;
+  //   // If 'fill' is true, do not pass 'width' and 'height'
+  //   // If 'fill' is false, you WOULD need to pass valid 'width' and 'height'
+  //   // For simplicity, assuming 'fill' is always true here as per your original code.
+  //      // Filter out width and height from 'props' if 'fill' is true.
+  //   // This creates a new object 'remainingProps' that explicitly does NOT have 'width' or 'height'.
+  //   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  //   const { width: _width, height: _height, ...remainingProps } = props;
 
 
-    return (
-      <Image
-        className={cn("rounded-md border", className)}
-        src={imgSrc}
-        alt={alt || ""}
-        loading="lazy"
-        fill // Explicitly set fill to true
-        {...(remainingProps as Omit<React.ComponentPropsWithoutRef<typeof Image>, 'width' | 'height' | 'src' | 'alt' | 'fill' | 'loading'>)}
-      />
-    );
-  },
+  //   return (
+  //     <Image
+  //       className={cn("rounded-md border", className)}
+  //       src={imgSrc}
+  //       alt={alt || ""}
+  //       loading="lazy"
+  //       fill // Explicitly set fill to true
+  //       {...(remainingProps as Omit<React.ComponentPropsWithoutRef<typeof Image>, 'width' | 'height' | 'src' | 'alt' | 'fill' | 'loading'>)}
+  //     />
+  //   );
+  // },
 
   // Horizontal Rule
   hr: ({ className, ...props }: React.HTMLAttributes<HTMLHRElement>) => (
