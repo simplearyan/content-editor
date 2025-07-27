@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input'; // For title/slug input
 import { Label } from '@/components/ui/label'; // For form labels
+// --- NEW IMPORTS FOR RADIO GROUP ---
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 // Your custom components
 import { MarkdownPreview } from '@/components/markdown-preview'; // For rendering markdown preview
@@ -49,6 +51,14 @@ export default function AdminEditorPage() {
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [fileList, setFileList] = useState<GitHubFile[]>([]); // To display existing files for selection
 
+    // --- NEW STATES FOR IMAGE, TAGS, CATEGORY ---
+  const [image, setImage] = useState<string>(''); // For the cover image URL
+  const [tags, setTags] = useState<string>('');   // Comma-separated string for tags
+  const [category, setCategory] = useState<string>(''); // For the category string
+
+    // --- NEW STATE FOR FILE FORMAT ---
+  const [fileFormat, setFileFormat] = useState<'mdx' | 'md'>('mdx'); // Default to MDX
+
   // --- Authentication and Redirection ---
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -57,30 +67,6 @@ export default function AdminEditorPage() {
   }, [status, router]);
 
   // --- Fetching Existing Files (Optional, but good for an editor) ---
-  // useEffect(() => {
-  //   // Function to fetch existing markdown files from GitHub
-  //   const fetchFiles = async () => {
-  //     try {
-  //       // You'll need an API route in your app to list files from GitHub
-  //       // This is a conceptual endpoint. You'd create `/api/admin/files` that
-  //       // uses your github-admin.ts to list contents of GITHUB_CONTENT_PATH.
-  //       const res = await fetch('/api/admin/files');
-  //       if (!res.ok) {
-  //         throw new Error(`Failed to fetch file list: ${res.statusText}`);
-  //       }
-  //       const files : GitHubFile[] = await res.json();
-  //       setFileList(files); // Assuming 'files' is an array of file paths relative to content root
-  //     } catch (error) {
-  //       console.error("Error fetching file list:", error);
-  //       alert("Failed to load existing files. Please check console for details.");
-  //     }
-  //   };
-
-  //   if (status === 'authenticated') {
-  //     fetchFiles();
-  //   }
-  // }, [status]);
-
     // --- Fetching Existing Files ---
   const fetchFiles = async () => {
     try {
@@ -113,43 +99,60 @@ export default function AdminEditorPage() {
       }
       const data = await res.json();
       // Assuming data contains { content: "---frontmatter---\nmarkdown content", sha: "..." }
-      const { content, sha } = data;
+      const { content: rawContent, sha } = data;
 
             // Use gray-matter to parse the content
-      // const { data: parsedData, content: markdownBody } = matter(rawContent);
+      const { data: parsedData, content: markdownBody } = matter(rawContent);
 
       // Set states based on parsed data
-      // setParsedFrontmatterData(parsedData); // Store the full parsed frontmatter object
-      // setTitle(parsedData.title || '');
-      // setSlug(parsedData.slug || slugify(parsedData.title || '', new Set())); // Use existing slug or generate
-      // setMarkdownContent(markdownBody); // This is just the markdown content, no frontmatter
-      // setCurrentFilePath(filePath);
+      setParsedFrontmatterData(parsedData); // Store the full parsed frontmatter object
+      setTitle(parsedData.title || '');
+      setSlug(parsedData.slug || slugify(parsedData.title || '', new Set())); // Use existing slug or generate
+      setMarkdownContent(markdownBody); // This is just the markdown content, no frontmatter
+      setCurrentFilePath(filePath);
+
+      // --- POPULATE NEW STATES FROM PARSED FRONTMATTER ---
+      setImage(parsedData.image || '');
+      setCategory(parsedData.category || '');
+      // Tags need special handling: array to comma-separated string
+      setTags(Array.isArray(parsedData.tags) ? parsedData.tags.join(', ') : '');
+
+      setCurrentFilePath(filePath); // Store the path for updates
       setCurrentFileSha(sha); // Store SHA for updates
 
       // alert(`Loaded file: ${filePath}`);
 
       // Parse frontmatter and markdown content
-      const parts = content.split('---');
-      if (parts.length >= 3) {
-        setFrontmatter(parts[1].trim()); // First '---' to second '---' is frontmatter
-        setMarkdownContent(parts.slice(2).join('---').trim()); // Rest is markdown
+      // const parts = rawContent.split('---');
+      // if (parts.length >= 3) {
+      //   setFrontmatter(parts[1].trim()); // First '---' to second '---' is frontmatter
+      //   setMarkdownContent(parts.slice(2).join('---').trim()); // Rest is markdown
+      // } else {
+      //   // No frontmatter, just markdown
+      //   setFrontmatter('');
+      //   setMarkdownContent(rawContent.trim());
+      // }
+
+      // // Extract title from frontmatter (simple regex for demonstration)
+      // const titleMatch = parts[1]?.match(/title:\s*(.*)/);
+      // if (titleMatch && titleMatch[1]) {
+      //   setTitle(titleMatch[1].trim());
+      //   setSlug(slugify(titleMatch[1].trim(), new Set())); // Auto-generate slug
+      // } else {
+      //   setTitle('');
+      //   setSlug('');
+      // }
+
+      // --- SET FILE FORMAT BASED ON LOADED FILE'S EXTENSION ---
+      const extension = filePath.split('.').pop()?.toLowerCase();
+      if (extension === 'mdx' || extension === 'md') {
+        setFileFormat(extension as 'mdx' | 'md');
       } else {
-        // No frontmatter, just markdown
-        setFrontmatter('');
-        setMarkdownContent(content.trim());
+        // Default to mdx if extension is unknown or missing
+        setFileFormat('mdx');
       }
 
-      // Extract title from frontmatter (simple regex for demonstration)
-      const titleMatch = parts[1]?.match(/title:\s*(.*)/);
-      if (titleMatch && titleMatch[1]) {
-        setTitle(titleMatch[1].trim());
-        setSlug(slugify(titleMatch[1].trim(), new Set())); // Auto-generate slug
-      } else {
-        setTitle('');
-        setSlug('');
-      }
 
-      setCurrentFilePath(filePath); // Store the path for updates
       alert(`Loaded file: ${filePath}`);
     } catch (error) {
       console.error("Error loading file:", error);
@@ -161,9 +164,14 @@ export default function AdminEditorPage() {
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTitle = e.target.value;
     setTitle(newTitle);
-    setSlug(slugify(newTitle, new Set())); // Auto-generate slug
-        // Update title in parsedFrontmatterData as well for consistency
-    // setParsedFrontmatterData(prev => ({ ...prev, title: newTitle }));
+    // ONLY auto-generate slug if it's a NEW file (currentFileSha will be undefined)
+    // If currentFileSha exists (an existing file is loaded), do NOT auto-generate.
+    // The slug will retain its value from when the file was loaded or from manual edits.
+    if (!currentFileSha) {
+      setSlug(slugify(newTitle, new Set()));
+    }
+    // Update title in parsedFrontmatterData as well for consistency
+    setParsedFrontmatterData(prev => ({ ...prev, title: newTitle }));
   };
 
   // --- Handle Slug Change (manual override) ---
@@ -177,6 +185,28 @@ export default function AdminEditorPage() {
   // --- Handle Markdown Content Change ---
   const handleMarkdownContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMarkdownContent(e.target.value);
+  };
+
+  // --- Handle Image URL Change ---
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newImage = e.target.value;
+    setImage(newImage);
+    setParsedFrontmatterData(prev => ({ ...prev, image: newImage }));
+  };
+
+  // --- Handle Category Change ---
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newCategory = e.target.value;
+    setCategory(newCategory);
+    setParsedFrontmatterData(prev => ({ ...prev, category: newCategory }));
+  };
+
+  // --- Handle Tags Change (string to array conversion on save will be done) ---
+  const handleTagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTags = e.target.value;
+    setTags(newTags);
+    // Don't update parsedFrontmatterData directly here for tags, do it on save after splitting
+    // This prevents trying to store a string where an array is expected prematurely.
   };
 
   // --- Handle Save/Update ---
@@ -195,7 +225,18 @@ export default function AdminEditorPage() {
       // Define the target file path in the GitHub repository
       // If currentFilePath exists, it's an update; otherwise, it's a new file.
       // Use .mdx by default for new files.
-      const filePathToSave = currentFilePath || `posts/${finalSlug}.mdx`;
+      // const filePathToSave = currentFilePath || `posts/${finalSlug}.mdx`;
+            let filePathToSave: string;
+      if (currentFilePath) {
+          // If updating an existing file, use its original path and format
+          filePathToSave = currentFilePath;
+      } else {
+          // For a brand new file, use the selected fileFormat
+          filePathToSave = `posts/${finalSlug}.${fileFormat}`;
+      }
+
+      // Convert comma-separated tags string to an array for front matter
+      const tagsArray = tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
 
       // Construct the final front matter object
       const finalFrontmatterData = {
@@ -203,7 +244,11 @@ export default function AdminEditorPage() {
         title: title,             // Override with current title input
         slug: finalSlug,          // Override with current slug input
         // Ensure date is always present and updated
-        date: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
+        date: new Date().toISOString().split('T')[0], // Always set current date
+        // --- INCLUDE NEW FIELDS IN FINAL FRONT MATTER ---
+        image: image,
+        category: category,
+        tags: tagsArray, // Assign the processed tags array        
       };
 
       // Use gray-matter's stringify to combine front matter and content
@@ -219,7 +264,7 @@ export default function AdminEditorPage() {
         method: 'POST', // Or 'PUT' if you prefer for updates
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          filePath: filePath,
+          filePath: filePathToSave,
           // filePath: filePathToSave, // Use the path to save
           content: fullContent,
           commitMessage: currentFilePath ? `Update: ${title}` : `Create: ${title}`,
@@ -233,7 +278,7 @@ export default function AdminEditorPage() {
         throw new Error(errorData.error || `Failed to save content: ${res.statusText}`);
       }
 
-      alert(`Content saved successfully! File: ${filePath} (${currentFilePath ? 'updated' : 'created'})`);
+      alert(`Content saved successfully! File: ${filePathToSave} (${currentFilePath ? 'updated' : 'created'})`);
       // Optionally clear form or refresh file list
       // setTitle('');
       // setSlug('');
@@ -273,8 +318,14 @@ export default function AdminEditorPage() {
       setTitle('');
       setSlug('');
       setMarkdownContent('');
-      setFrontmatter('');
+      setFrontmatter(''); // Clear frontmatter
+      setParsedFrontmatterData({});
       setCurrentFilePath(null);
+      setCurrentFileSha(undefined); // Clear SHA
+      setImage(''); // Clear new fields
+      setTags('');
+      setCategory('');
+      setFileFormat('mdx'); // Reset file format to default
       fetchFiles(); // Refresh list after delete
     } catch (error: any) {
       console.error("Error deleting content:", error);
@@ -325,13 +376,39 @@ export default function AdminEditorPage() {
               {/* Create New File */}
               <div>
                 <h3 className="text-lg font-semibold mb-2">Create New Content</h3>
+                {/* --- NEW FILE FORMAT SELECTION --- */}
+                <div className="mb-4">
+                    <Label className="mb-2 block">File Format</Label>
+                    <RadioGroup
+                        defaultValue="mdx"
+                        value={fileFormat}
+                        onValueChange={(value: 'mdx' | 'md') => setFileFormat(value)}
+                        className="flex space-x-4"
+                    >
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="mdx" id="format-mdx" />
+                            <Label htmlFor="format-mdx">.mdx</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="md" id="format-md" />
+                            <Label htmlFor="format-md">.md</Label>
+                        </div>
+                    </RadioGroup>
+                </div>
+                {/* --- END NEW FILE FORMAT SELECTION --- */}
                 <Button
                   onClick={() => {
                     setTitle('');
                     setSlug('');
                     setMarkdownContent('');
                     setFrontmatter('');
+                    setParsedFrontmatterData({});
                     setCurrentFilePath(null);
+                    setCurrentFileSha(undefined);
+                    setImage('');
+                    setTags('');
+                    setCategory('');
+                    setFileFormat('mdx'); // Reset format to default
                     alert("New content file created. Start writing!");
                   }}
                   className="w-full"
@@ -388,11 +465,40 @@ export default function AdminEditorPage() {
                   id="slug"
                   placeholder="content-slug"
                   value={slug}
-                  onChange={(e) => setSlug(e.target.value)} // Allow manual override
-                  disabled={!title} // Disable if no title
+                  onChange={handleSlugChange} // Use new handler for slug
+                  disabled={!title && !slug} // Disable if no title
+                />
+              </div>
+              {/* --- NEW INPUTS FOR IMAGE, CATEGORY, TAGS --- */}
+              <div>
+                <Label htmlFor="image">Cover Image URL</Label>
+                <Input
+                  id="image"
+                  placeholder="e.g., https://raw.githubusercontent.com/user/repo/branch/images/cover.jpg"
+                  value={image}
+                  onChange={handleImageChange}
                 />
               </div>
               <div>
+                <Label htmlFor="category">Category</Label>
+                <Input
+                  id="category"
+                  placeholder="e.g., Development, Design, Life"
+                  value={category}
+                  onChange={handleCategoryChange}
+                />
+              </div>
+              <div>
+                <Label htmlFor="tags">Tags (comma-separated)</Label>
+                <Input
+                  id="tags"
+                  placeholder="e.g., javascript, react, nextjs"
+                  value={tags}
+                  onChange={handleTagsChange}
+                />
+              </div>
+              {/* --- END NEW INPUTS --- */}
+              {/* <div>
                 <Label htmlFor="frontmatter">Frontmatter (YAML)</Label>
                 <Textarea
                   id="frontmatter"
@@ -404,7 +510,7 @@ export default function AdminEditorPage() {
                 <p className="text-xs text-gray-500 mt-1">
                   Add additional YAML frontmatter here (e.g., tags, categories).
                 </p>
-              </div>
+              </div> */}
               <div>
                 <Label htmlFor="markdownContent">Markdown Content</Label>
                 <Textarea
@@ -412,7 +518,7 @@ export default function AdminEditorPage() {
                   className="min-h-[400px] font-mono"
                   placeholder="Start writing your Markdown content here..."
                   value={markdownContent}
-                  onChange={(e) => setMarkdownContent(e.target.value)}
+                  onChange={handleMarkdownContentChange} // Use new handler for markdown content
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   Supports LaTeX with $...$ and $$...$$, and code highlighting.
