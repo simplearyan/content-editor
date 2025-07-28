@@ -52,10 +52,19 @@ export default function AdminEditorPage() {
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [fileList, setFileList] = useState<GitHubFile[]>([]); // To display existing files for selection
 
+    // --- Common Front Matter States (for both posts & courses) ---
+  const [author, setAuthor] = useState<string>('');
+  const [description, setDescription] = useState<string>('');
+
     // --- NEW STATES FOR IMAGE, TAGS, CATEGORY ---
   const [image, setImage] = useState<string>(''); // For the cover image URL
   const [tags, setTags] = useState<string>('');   // Comma-separated string for tags
   const [category, setCategory] = useState<string>(''); // For the category string
+
+    // --- Course Lesson Specific Front Matter States ---
+  const [lessonOrder, setLessonOrder] = useState<number | ''>(''); // e.g., 1, 2, 3
+  const [duration, setDuration] = useState<string>(''); // e.g., "15 min", "1 hour"
+  const [videoUrl, setVideoUrl] = useState<string>(''); // e.g., YouTube URL, Vimeo URL
 
   // --- NEW STATES FOR CONTENT TYPE AND FOLDER STRUCTURE ---
   const [contentBaseDir, setContentBaseDir] = useState<'posts' | 'courses'>('posts'); // 'posts' or 'courses'
@@ -179,11 +188,28 @@ export default function AdminEditorPage() {
       setMarkdownContent(markdownBody); // This is just the markdown content, no frontmatter
       setCurrentFilePath(filePath);
 
-      // --- POPULATE NEW STATES FROM PARSED FRONTMATTER ---
-      setImage(parsedData.image || '');
-      setCategory(parsedData.category || '');
-      // Tags need special handling: array to comma-separated string
-      setTags(Array.isArray(parsedData.tags) ? parsedData.tags.join(', ') : '');
+      // --- Populate Common Front Matter Fields ---
+      setAuthor(parsedData.author || '');
+      setDescription(parsedData.description || '');
+
+      // --- Populate Type-Specific Front Matter Fields and Clear Others ---
+      if (filePath.startsWith('posts/')) {
+        setImage(parsedData.image || '');
+        setCategory(parsedData.category || '');
+        setTags(Array.isArray(parsedData.tags) ? parsedData.tags.join(', ') : '');
+        // Clear course-specific fields
+        setLessonOrder('');
+        setDuration('');
+        setVideoUrl('');
+      } else if (filePath.startsWith('courses/')) {
+        setLessonOrder(parsedData.lessonOrder ?? '');
+        setDuration(parsedData.duration || '');
+        setVideoUrl(parsedData.videoUrl || '');
+        // Clear blog-specific fields
+        setImage('');
+        setCategory('');
+        setTags('');
+      }
 
       setCurrentFilePath(filePath); // Store the path for updates
       setCurrentFileSha(sha); // Store SHA for updates
@@ -233,33 +259,48 @@ export default function AdminEditorPage() {
     setMarkdownContent(e.target.value);
   };
 
-  // --- Handle Image URL Change ---
+const handleAuthorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAuthor(e.target.value);
+    setParsedFrontmatterData(prev => ({ ...prev, author: e.target.value }));
+  };
+
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDescription(e.target.value);
+    setParsedFrontmatterData(prev => ({ ...prev, description: e.target.value }));
+  };
+
+  // Blog-specific handlers
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newImage = e.target.value;
-    setImage(newImage);
-    setParsedFrontmatterData(prev => ({ ...prev, image: newImage }));
+    setImage(e.target.value);
   };
 
-  // --- Handle Category Change ---
   const handleCategoryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newCategory = e.target.value;
-    setCategory(newCategory);
-    setParsedFrontmatterData(prev => ({ ...prev, category: newCategory }));
+    setCategory(e.target.value);
   };
 
-  // --- Handle Tags Change (string to array conversion on save will be done) ---
   const handleTagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newTags = e.target.value;
-    setTags(newTags);
-    // Don't update parsedFrontmatterData directly here for tags, do it on save after splitting
-    // This prevents trying to store a string where an array is expected prematurely.
+    setTags(e.target.value);
   };
 
-    // --- Handle Course Folder Name Change ---
+  // Course-specific handlers
+  const handleLessonOrderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setLessonOrder(value === '' ? '' : Number(value));
+  };
+
+  const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDuration(e.target.value);
+  };
+
+  const handleVideoUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setVideoUrl(e.target.value);
+  };
+
   const handleCourseFolderNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newFolderName = slugify(e.target.value, new Set()); // Slugify folder name too
+    const newFolderName = slugify(e.target.value, new Set());
     setCourseFolderName(newFolderName);
   };
+
 
   // --- Handle Save/Update ---
   const handleSave = async () => {
@@ -301,18 +342,29 @@ export default function AdminEditorPage() {
       // Convert comma-separated tags string to an array for front matter
       const tagsArray = tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
 
-      // Construct the final front matter object
-      const finalFrontmatterData = {
+      // --- Construct Final Front Matter Data based on Content Type ---
+      const finalFrontmatterData: Record<string, any> = {
         ...parsedFrontmatterData, // Start with any existing parsed front matter
         title: title,             // Override with current title input
         slug: finalSlug,          // Override with current slug input
         // Ensure date is always present and updated
         date: new Date().toISOString().split('T')[0], // Always set current date
-        // --- INCLUDE NEW FIELDS IN FINAL FRONT MATTER ---
-        image: image,
-        category: category,
-        tags: tagsArray, // Assign the processed tags array        
+        author: author,
+        description: description,
       };
+
+      if (contentBaseDir === 'posts') {
+        finalFrontmatterData.image = image;
+        finalFrontmatterData.category = category;
+        finalFrontmatterData.tags = tagsArray;
+      } else { // courses
+        if (lessonOrder !== '') finalFrontmatterData.lessonOrder = Number(lessonOrder);
+        finalFrontmatterData.duration = duration;
+        finalFrontmatterData.videoUrl = videoUrl;
+        // You can still include category/tags for courses if desired, or make them common
+        // finalFrontmatterData.category = category;
+        // finalFrontmatterData.tags = tagsArray;
+      }
 
       // Use gray-matter's stringify to combine front matter and content
       const fullContent = matter.stringify(markdownContent, finalFrontmatterData);
@@ -381,14 +433,23 @@ export default function AdminEditorPage() {
       setTitle('');
       setSlug('');
       setMarkdownContent('');
-      setFrontmatter(''); // Clear frontmatter
       setParsedFrontmatterData({});
       setCurrentFilePath(null);
-      setCurrentFileSha(undefined); // Clear SHA
-      setImage(''); // Clear new fields
+      setCurrentFileSha(undefined);
+
+      // Reset all front matter states
+      setAuthor('');
+      setDescription('');
+      setImage('');
       setTags('');
       setCategory('');
-      setFileFormat('mdx'); // Reset file format to default
+      setLessonOrder('');
+      setDuration('');
+      setVideoUrl('');
+
+      setFileFormat('mdx');
+      setContentBaseDir('posts');
+      setCourseFolderName('');
       fetchFiles(); // Refresh list after delete
     } catch (error: any) {
       console.error("Error deleting content:", error);
@@ -502,13 +563,17 @@ export default function AdminEditorPage() {
                     setTitle('');
                     setSlug('');
                     setMarkdownContent('');
-                    setFrontmatter('');
                     setParsedFrontmatterData({});
                     setCurrentFilePath(null);
                     setCurrentFileSha(undefined);
+                    setAuthor('')
+                    setDescription('')
                     setImage('');
                     setTags('');
                     setCategory('');
+                    setLessonOrder('')
+                    setDuration('')
+                    setVideoUrl('')
                     setFileFormat('mdx'); // Reset format to default
                     setContentBaseDir('posts'); // Reset to default
                     setCourseFolderName('');    // Clear course folder name
@@ -573,48 +638,97 @@ export default function AdminEditorPage() {
                   disabled={!title && !slug} // Disable if no title
                 />
               </div>
-              {/* --- NEW INPUTS FOR IMAGE, CATEGORY, TAGS --- */}
               <div>
-                <Label htmlFor="image">Cover Image URL</Label>
+                <Label htmlFor="author">Author</Label>
                 <Input
-                  id="image"
-                  placeholder="e.g., https://raw.githubusercontent.com/user/repo/branch/images/cover.jpg"
-                  value={image}
-                  onChange={handleImageChange}
+                  id="author"
+                  placeholder="e.g., John Doe"
+                  value={author}
+                  onChange={handleAuthorChange}
                 />
               </div>
               <div>
-                <Label htmlFor="category">Category</Label>
+                <Label htmlFor="description">Description</Label>
                 <Input
-                  id="category"
-                  placeholder="e.g., Development, Design, Life"
-                  value={category}
-                  onChange={handleCategoryChange}
+                  id="description"
+                  placeholder="A brief summary of the content"
+                  value={description}
+                  onChange={handleDescriptionChange}
                 />
               </div>
-              <div>
-                <Label htmlFor="tags">Tags (comma-separated)</Label>
-                <Input
-                  id="tags"
-                  placeholder="e.g., javascript, react, nextjs"
-                  value={tags}
-                  onChange={handleTagsChange}
-                />
-              </div>
+
+              {/* Blog Post Specific Fields (Conditional) */}
+              {contentBaseDir === 'posts' && (
+                <>
+                  <Separator className="my-4" />
+                  <h3 className="text-lg font-semibold">Blog Post Specific Front Matter</h3>
+                  <div>
+                    <Label htmlFor="image">Cover Image URL</Label>
+                    <Input
+                      id="image"
+                      placeholder="e.g., https://raw.githubusercontent.com/user/repo/branch/images/cover.jpg"
+                      value={image}
+                      onChange={handleImageChange}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="category">Category</Label>
+                    <Input
+                      id="category"
+                      placeholder="e.g., Development, Design, Life"
+                      value={category}
+                      onChange={handleCategoryChange}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="tags">Tags (comma-separated)</Label>
+                    <Input
+                      id="tags"
+                      placeholder="e.g., javascript, react, nextjs"
+                      value={tags}
+                      onChange={handleTagsChange}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Course Lesson Specific Fields (Conditional) */}
+              {contentBaseDir === 'courses' && (
+                <>
+                  <Separator className="my-4" />
+                  <h3 className="text-lg font-semibold">Course Lesson Specific Front Matter</h3>
+                  <div>
+                    <Label htmlFor="lessonOrder">Lesson Order (Number)</Label>
+                    <Input
+                      id="lessonOrder"
+                      type="number"
+                      placeholder="e.g., 1"
+                      value={lessonOrder}
+                      onChange={handleLessonOrderChange}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="duration">Duration</Label>
+                    <Input
+                      id="duration"
+                      placeholder="e.g., 15 min, 1 hour"
+                      value={duration}
+                      onChange={handleDurationChange}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="videoUrl">Video URL</Label>
+                    <Input
+                      id="videoUrl"
+                      placeholder="e.g., https://www.youtube.com/watch?v=..."
+                      value={videoUrl}
+                      onChange={handleVideoUrlChange}
+                    />
+                  </div>
+                </>
+              )}
               {/* --- END NEW INPUTS --- */}
-              {/* <div>
-                <Label htmlFor="frontmatter">Frontmatter (YAML)</Label>
-                <Textarea
-                  id="frontmatter"
-                  placeholder={`date: ${new Date().toISOString().split('T')[0]}\ndescription: Your content description`}
-                  value={frontmatter}
-                  onChange={(e) => setFrontmatter(e.target.value)}
-                  className="min-h-[100px] font-mono text-xs"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Add additional YAML frontmatter here (e.g., tags, categories).
-                </p>
-              </div> */}
+              {/* Markdown Content (Common to both) */}
               <div>
                 <Label htmlFor="markdownContent">Markdown Content</Label>
                 <Textarea
