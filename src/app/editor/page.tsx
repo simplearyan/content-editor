@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'; // For title/slug input
 import { Label } from '@/components/ui/label'; // For form labels
 // --- NEW IMPORTS FOR RADIO GROUP ---
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Separator } from '@/components/ui/separator'; // Add separator for visual grouping
 
 // Your custom components
 import { MarkdownPreview } from '@/components/editor/markdown-preview'; // For rendering markdown preview
@@ -56,6 +57,11 @@ export default function AdminEditorPage() {
   const [tags, setTags] = useState<string>('');   // Comma-separated string for tags
   const [category, setCategory] = useState<string>(''); // For the category string
 
+  // --- NEW STATES FOR CONTENT TYPE AND FOLDER STRUCTURE ---
+  const [contentBaseDir, setContentBaseDir] = useState<'posts' | 'courses'>('posts'); // 'posts' or 'courses'
+  const [courseFolderName, setCourseFolderName] = useState<string>(''); // For 'courses/{folder_name}/file.mdx'
+  // --- END NEW STATES ---
+
     // --- NEW STATE FOR FILE FORMAT ---
   const [fileFormat, setFileFormat] = useState<'mdx' | 'md'>('mdx'); // Default to MDX
 
@@ -68,14 +74,56 @@ export default function AdminEditorPage() {
 
   // --- Fetching Existing Files (Optional, but good for an editor) ---
     // --- Fetching Existing Files ---
+  // const fetchFiles = async () => {
+  //   try {
+  //     const res = await fetch('/api/admin/files');
+  //     if (!res.ok) {
+  //       throw new Error(`Failed to fetch file list: ${res.statusText}`);
+  //     }
+  //     const files: GitHubFile[] = await res.json();
+  //     setFileList(files.filter(file => file.type === 'file' && (file.name.endsWith('.md') || file.name.endsWith('.mdx'))));
+  //   } catch (error) {
+  //     console.error("Error fetching file list:", error);
+  //     alert("Failed to load existing files. Please check console for details.");
+  //   }
+  // };
+   // --- Fetching Existing Files ---
   const fetchFiles = async () => {
     try {
-      const res = await fetch('/api/admin/files');
-      if (!res.ok) {
-        throw new Error(`Failed to fetch file list: ${res.statusText}`);
+      const postsRes = await fetch('/api/admin/files?path=posts');
+      const coursesRes = await fetch('/api/admin/files?path=courses');
+
+      if (!postsRes.ok || !coursesRes.ok) {
+        throw new Error(`Failed to fetch file list: ${postsRes.statusText || coursesRes.statusText}`);
       }
-      const files: GitHubFile[] = await res.json();
-      setFileList(files.filter(file => file.type === 'file' && (file.name.endsWith('.md') || file.name.endsWith('.mdx'))));
+
+      const postsFiles: GitHubFile[] = await postsRes.json();
+      const coursesFolders: GitHubFile[] = await coursesRes.json(); // This will return top-level directories under 'courses'
+
+      let allFiles: GitHubFile[] = [];
+
+      // Add all markdown/mdx files from 'posts/'
+      allFiles = allFiles.concat(
+        postsFiles.filter(file => file.type === 'file' && (file.name.endsWith('.md') || file.name.endsWith('.mdx')))
+      );
+
+      // Recursively fetch files from within course folders
+      const courseLessonPromises = coursesFolders
+        .filter(folder => folder.type === 'dir')
+        .map(async (folder) => {
+          const folderFilesRes = await fetch(`/api/admin/files?path=${encodeURIComponent(folder.path)}`);
+          if (!folderFilesRes.ok) {
+            console.error(`Failed to fetch files from course folder ${folder.path}: ${folderFilesRes.statusText}`);
+            return [];
+          }
+          const folderFiles: GitHubFile[] = await folderFilesRes.json();
+          return folderFiles.filter(file => file.type === 'file' && (file.name.endsWith('.md') || file.name.endsWith('.mdx')));
+        });
+
+      const courseLessons = (await Promise.all(courseLessonPromises)).flat();
+      allFiles = allFiles.concat(courseLessons);
+
+      setFileList(allFiles);
     } catch (error) {
       console.error("Error fetching file list:", error);
       alert("Failed to load existing files. Please check console for details.");
@@ -104,6 +152,26 @@ export default function AdminEditorPage() {
             // Use gray-matter to parse the content
       const { data: parsedData, content: markdownBody } = matter(rawContent);
 
+            // Determine content type and folder based on filePath
+      if (filePath.startsWith('posts/')) {
+        setContentBaseDir('posts');
+        setCourseFolderName(''); // Clear course folder for posts
+      } else if (filePath.startsWith('courses/')) {
+        setContentBaseDir('courses');
+        // Extract course folder name: e.g., "courses/my-course/lesson.mdx" -> "my-course"
+        const pathParts = filePath.split('/');
+        if (pathParts.length >= 3) { // Expecting at least "courses", "course-folder", "file.mdx"
+          setCourseFolderName(pathParts[1]); // The second part is the course folder name
+        } else {
+          setCourseFolderName(''); // Fallback
+        }
+      } else {
+        // Default or error handling for unknown paths
+        setContentBaseDir('posts');
+        setCourseFolderName('');
+        console.warn(`Unknown file path structure: ${filePath}. Defaulting to 'posts'.`);
+      }
+
       // Set states based on parsed data
       setParsedFrontmatterData(parsedData); // Store the full parsed frontmatter object
       setTitle(parsedData.title || '');
@@ -120,28 +188,6 @@ export default function AdminEditorPage() {
       setCurrentFilePath(filePath); // Store the path for updates
       setCurrentFileSha(sha); // Store SHA for updates
 
-      // alert(`Loaded file: ${filePath}`);
-
-      // Parse frontmatter and markdown content
-      // const parts = rawContent.split('---');
-      // if (parts.length >= 3) {
-      //   setFrontmatter(parts[1].trim()); // First '---' to second '---' is frontmatter
-      //   setMarkdownContent(parts.slice(2).join('---').trim()); // Rest is markdown
-      // } else {
-      //   // No frontmatter, just markdown
-      //   setFrontmatter('');
-      //   setMarkdownContent(rawContent.trim());
-      // }
-
-      // // Extract title from frontmatter (simple regex for demonstration)
-      // const titleMatch = parts[1]?.match(/title:\s*(.*)/);
-      // if (titleMatch && titleMatch[1]) {
-      //   setTitle(titleMatch[1].trim());
-      //   setSlug(slugify(titleMatch[1].trim(), new Set())); // Auto-generate slug
-      // } else {
-      //   setTitle('');
-      //   setSlug('');
-      // }
 
       // --- SET FILE FORMAT BASED ON LOADED FILE'S EXTENSION ---
       const extension = filePath.split('.').pop()?.toLowerCase();
@@ -209,6 +255,12 @@ export default function AdminEditorPage() {
     // This prevents trying to store a string where an array is expected prematurely.
   };
 
+    // --- Handle Course Folder Name Change ---
+  const handleCourseFolderNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newFolderName = slugify(e.target.value, new Set()); // Slugify folder name too
+    setCourseFolderName(newFolderName);
+  };
+
   // --- Handle Save/Update ---
   const handleSave = async () => {
     setIsSaving(true);
@@ -219,8 +271,13 @@ export default function AdminEditorPage() {
         return;
       }
 
+      if (contentBaseDir === 'courses' && !courseFolderName) {
+        alert("Course Folder Name cannot be empty for course content.");
+        setIsSaving(false);
+        return;
+      }
+
       const finalSlug = slug || slugify(title, new Set()); // Ensure slug is present
-      const filePath = `posts/${finalSlug}.mdx`; // Example: all content goes into 'posts' directory as .mdx
 
       // Define the target file path in the GitHub repository
       // If currentFilePath exists, it's an update; otherwise, it's a new file.
@@ -232,7 +289,13 @@ export default function AdminEditorPage() {
           filePathToSave = currentFilePath;
       } else {
           // For a brand new file, use the selected fileFormat
-          filePathToSave = `posts/${finalSlug}.${fileFormat}`;
+          // filePathToSave = `posts/${finalSlug}.${fileFormat}`;
+                    // For a brand new file, construct path based on contentBaseDir and folderName
+          if (contentBaseDir === 'posts') {
+              filePathToSave = `posts/${finalSlug}.${fileFormat}`;
+          } else { // 'courses'
+              filePathToSave = `courses/${courseFolderName}/${finalSlug}.${fileFormat}`;
+          }
       }
 
       // Convert comma-separated tags string to an array for front matter
@@ -267,7 +330,7 @@ export default function AdminEditorPage() {
           filePath: filePathToSave,
           // filePath: filePathToSave, // Use the path to save
           content: fullContent,
-          commitMessage: currentFilePath ? `Update: ${title}` : `Create: ${title}`,
+          commitMessage: currentFilePath ? `Update: ${title}` : `Create: ${title} (${contentBaseDir === 'posts' ? 'post' : 'course lesson'})`,
           // You might need to pass the SHA for updates if your save API requires it for concurrency control
           sha: currentFileSha,
         }),
@@ -376,6 +439,44 @@ export default function AdminEditorPage() {
               {/* Create New File */}
               <div>
                 <h3 className="text-lg font-semibold mb-2">Create New Content</h3>
+                {/* Content Type Selection */}
+                <div className="mb-4">
+                    <Label className="mb-2 block">Content Type</Label>
+                    <RadioGroup
+                        defaultValue="posts"
+                        value={contentBaseDir}
+                        onValueChange={(value: 'posts' | 'courses') => {
+                            setContentBaseDir(value);
+                            setCourseFolderName(''); // Clear folder name when switching type
+                        }}
+                        className="flex space-x-4"
+                    >
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="posts" id="type-post" />
+                            <Label htmlFor="type-post">Blog Post</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="courses" id="type-course" />
+                            <Label htmlFor="type-course">Course Lesson</Label>
+                        </div>
+                    </RadioGroup>
+                </div>
+
+                 {/* Course Folder Name Input (conditional) */}
+                {contentBaseDir === 'courses' && (
+                  <div className="mb-4">
+                      <Label htmlFor="courseFolderName">Course Folder Name (e.g., introduction-to-js)</Label>
+                      <Input
+                        id="courseFolderName"
+                        placeholder="Enter course folder name"
+                        value={courseFolderName}
+                        onChange={handleCourseFolderNameChange}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">This will be the folder within the 'courses' directory.</p>
+                  </div>
+                )}
+                <Separator className="my-4" /> {/* Separator for visual clarity */}
+
                 {/* --- NEW FILE FORMAT SELECTION --- */}
                 <div className="mb-4">
                     <Label className="mb-2 block">File Format</Label>
@@ -409,6 +510,9 @@ export default function AdminEditorPage() {
                     setTags('');
                     setCategory('');
                     setFileFormat('mdx'); // Reset format to default
+                    setContentBaseDir('posts'); // Reset to default
+                    setCourseFolderName('');    // Clear course folder name
+
                     alert("New content file created. Start writing!");
                   }}
                   className="w-full"
@@ -430,7 +534,7 @@ export default function AdminEditorPage() {
                             className="w-full justify-start h-auto py-1 px-2 text-sm"
                             onClick={() => handleFileSelect(file.path)}
                           >
-                            {file.name}
+                            {file.path}
                           </Button>
                         </li>
                       ))}
@@ -460,7 +564,7 @@ export default function AdminEditorPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="slug">Slug (Auto-generated)</Label>
+                <Label htmlFor="slug">Slug (Auto-generated / Editable)</Label>
                 <Input
                   id="slug"
                   placeholder="content-slug"

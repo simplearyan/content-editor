@@ -37,6 +37,7 @@ export const GITHUB_REPO_NAME = process.env.GITHUB_REPO_NAME;
 export const GITHUB_CONTENT_PATH = process.env.GITHUB_CONTENT_PATH || "posts";
 export const GITHUB_BRANCH_NAME = process.env.GITHUB_BRANCH_NAME;
 
+export const octokit = new Octokit();
 /**
  * Gets an authenticated Octokit instance using a GitHub Personal Access Token (PAT).
  * This token is configured directly in your environment variables.
