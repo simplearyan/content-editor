@@ -476,89 +476,78 @@ const handleAuthorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   // --- Render Editor if Authenticated ---
   if (session) {
     return (
-      <div>
-        {/* <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Welcome to the Admin Editor, {session.user?.name || 'Admin'}!</h1>
-          <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600 dark:text-gray-400">
-              Signed in via {session.provider} (
-              {session.user?.email ? session.user.email : session.user?.githubUsername})
-            </span>
-            <Button onClick={() => signOut()} variant="outline">
-              Sign Out
-            </Button>
-          </div>
-        </div> */}
+    <div className="container mx-auto text-foreground min-h-screen">
 
-        {/* File Management / New File Section */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Manage Content</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Create New File */}
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Create New Content</h3>
-                {/* Content Type Selection */}
-                <div className="mb-4">
-                    <Label className="mb-2 block">Content Type</Label>
-                    <RadioGroup
-                        defaultValue="posts"
-                        value={contentBaseDir}
-                        onValueChange={(value: 'posts' | 'courses') => {
-                            setContentBaseDir(value);
-                            setCourseFolderName(''); // Clear folder name when switching type
-                        }}
-                        className="flex space-x-4"
-                    >
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="posts" id="type-post" />
-                            <Label htmlFor="type-post">Blog Post</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="courses" id="type-course" />
-                            <Label htmlFor="type-course">Course Lesson</Label>
-                        </div>
-                    </RadioGroup>
-                </div>
-
-                 {/* Course Folder Name Input (conditional) */}
-                {contentBaseDir === 'courses' && (
-                  <div className="mb-4">
-                      <Label htmlFor="courseFolderName">Course Folder Name (e.g., introduction-to-js)</Label>
-                      <Input
-                        id="courseFolderName"
-                        placeholder="Enter course folder name"
-                        value={courseFolderName}
-                        onChange={handleCourseFolderNameChange}
-                      />
-                      <p className="text-xs text-gray-500 mt-1">This will be the folder within the 'courses' directory.</p>
+      {/* File Management / New File Section */}
+      <Card className="mb-8 shadow-lg rounded-xl border border-border">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-2xl font-semibold text-card-foreground">Manage Content</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Create New File */}
+            <div className="p-4 border border-border rounded-lg bg-secondary/20 shadow-inner">
+              <h3 className="text-xl font-semibold mb-4 text-secondary-foreground">Create New Content</h3>
+              {/* Content Type Selection */}
+              <div className="mb-5">
+                <Label className="mb-2 block text-sm font-medium text-muted-foreground">Content Type</Label>
+                <RadioGroup
+                  defaultValue="posts"
+                  value={contentBaseDir}
+                  onValueChange={(value: 'posts' | 'courses') => {
+                    setContentBaseDir(value);
+                    setCourseFolderName(''); // Clear folder name when switching type
+                  }}
+                  className="flex flex-wrap gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="posts" id="type-post" />
+                    <Label htmlFor="type-post" className="text-base">Blog Post</Label>
                   </div>
-                )}
-                <Separator className="my-4" /> {/* Separator for visual clarity */}
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="courses" id="type-course" />
+                    <Label htmlFor="type-course" className="text-base">Course Lesson</Label>
+                  </div>
+                </RadioGroup>
+              </div>
 
-                {/* --- NEW FILE FORMAT SELECTION --- */}
-                <div className="mb-4">
-                    <Label className="mb-2 block">File Format</Label>
-                    <RadioGroup
-                        defaultValue="mdx"
-                        value={fileFormat}
-                        onValueChange={(value: 'mdx' | 'md') => setFileFormat(value)}
-                        className="flex space-x-4"
-                    >
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="mdx" id="format-mdx" />
-                            <Label htmlFor="format-mdx">.mdx</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="md" id="format-md" />
-                            <Label htmlFor="format-md">.md</Label>
-                        </div>
-                    </RadioGroup>
+              {/* Course Folder Name Input (conditional) */}
+              {contentBaseDir === 'courses' && (
+                <div className="mb-5">
+                  <Label htmlFor="courseFolderName" className="text-sm font-medium text-muted-foreground">Course Folder Name (e.g., introduction-to-js)</Label>
+                  <Input
+                    id="courseFolderName"
+                    placeholder="Enter course folder name"
+                    value={courseFolderName}
+                    onChange={handleCourseFolderNameChange}
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">This will be the folder within the 'courses' directory.</p>
                 </div>
-                {/* --- END NEW FILE FORMAT SELECTION --- */}
-                <Button
+              )}
+              <Separator className="my-6 bg-border" />
+
+              {/* --- NEW FILE FORMAT SELECTION --- */}
+              <div className="mb-6">
+                <Label className="mb-2 block text-sm font-medium text-muted-foreground">File Format</Label>
+                <RadioGroup
+                  defaultValue="mdx"
+                  value={fileFormat}
+                  onValueChange={(value: 'mdx' | 'md') => setFileFormat(value)}
+                  className="flex flex-wrap gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="mdx" id="format-mdx" />
+                    <Label htmlFor="format-mdx" className="text-base">.mdx</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="md" id="format-md" />
+                    <Label htmlFor="format-md" className="text-base">.md</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              {/* --- END NEW FILE FORMAT SELECTION --- */}
+              <Button
                   onClick={() => {
                     setTitle('');
                     setSlug('');
@@ -580,192 +569,211 @@ const handleAuthorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 
                     alert("New content file created. Start writing!");
                   }}
-                  className="w-full"
-                >
-                  New Empty File
-                </Button>
-              </div>
-
-              {/* Load Existing File */}
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Load Existing Content</h3>
-                <div className="max-h-48 overflow-y-auto border rounded-md p-2 bg-gray-100 dark:bg-gray-800">
-                  {fileList.length > 0 ? (
-                    <ul className="space-y-1">
-                      {fileList.map((file) => (
-                        <li key={file.path}>
-                          <Button
-                            variant="ghost"
-                            className="w-full justify-start h-auto py-1 px-2 text-sm"
-                            onClick={() => handleFileSelect(file.path)}
-                          >
-                            {file.path}
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-center text-sm text-gray-500">No existing files found.</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Editor Area */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Input Section */}
-          <div>
-            <h2 className="text-xl font-semibold mb-3">Content Details</h2>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="title">Title</Label>
-                <Input
-                  id="title"
-                  placeholder="Enter content title"
-                  value={title}
-                  onChange={handleTitleChange}
-                />
-              </div>
-              <div>
-                <Label htmlFor="slug">Slug (Auto-generated / Editable)</Label>
-                <Input
-                  id="slug"
-                  placeholder="content-slug"
-                  value={slug}
-                  onChange={handleSlugChange} // Use new handler for slug
-                  disabled={!title && !slug} // Disable if no title
-                />
-              </div>
-              <div>
-                <Label htmlFor="author">Author</Label>
-                <Input
-                  id="author"
-                  placeholder="e.g., John Doe"
-                  value={author}
-                  onChange={handleAuthorChange}
-                />
-              </div>
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Input
-                  id="description"
-                  placeholder="A brief summary of the content"
-                  value={description}
-                  onChange={handleDescriptionChange}
-                />
-              </div>
-
-              {/* Blog Post Specific Fields (Conditional) */}
-              {contentBaseDir === 'posts' && (
-                <>
-                  <Separator className="my-4" />
-                  <h3 className="text-lg font-semibold">Blog Post Specific Front Matter</h3>
-                  <div>
-                    <Label htmlFor="image">Cover Image URL</Label>
-                    <Input
-                      id="image"
-                      placeholder="e.g., https://raw.githubusercontent.com/user/repo/branch/images/cover.jpg"
-                      value={image}
-                      onChange={handleImageChange}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="category">Category</Label>
-                    <Input
-                      id="category"
-                      placeholder="e.g., Development, Design, Life"
-                      value={category}
-                      onChange={handleCategoryChange}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="tags">Tags (comma-separated)</Label>
-                    <Input
-                      id="tags"
-                      placeholder="e.g., javascript, react, nextjs"
-                      value={tags}
-                      onChange={handleTagsChange}
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* Course Lesson Specific Fields (Conditional) */}
-              {contentBaseDir === 'courses' && (
-                <>
-                  <Separator className="my-4" />
-                  <h3 className="text-lg font-semibold">Course Lesson Specific Front Matter</h3>
-                  <div>
-                    <Label htmlFor="lessonOrder">Lesson Order (Number)</Label>
-                    <Input
-                      id="lessonOrder"
-                      type="number"
-                      placeholder="e.g., 1"
-                      value={lessonOrder}
-                      onChange={handleLessonOrderChange}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="duration">Duration</Label>
-                    <Input
-                      id="duration"
-                      placeholder="e.g., 15 min, 1 hour"
-                      value={duration}
-                      onChange={handleDurationChange}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="videoUrl">Video URL</Label>
-                    <Input
-                      id="videoUrl"
-                      placeholder="e.g., https://www.youtube.com/watch?v=..."
-                      value={videoUrl}
-                      onChange={handleVideoUrlChange}
-                    />
-                  </div>
-                </>
-              )}
-              {/* --- END NEW INPUTS --- */}
-              {/* Markdown Content (Common to both) */}
-              <div>
-                <Label htmlFor="markdownContent">Markdown Content</Label>
-                <Textarea
-                  id="markdownContent"
-                  className="min-h-[400px] font-mono"
-                  placeholder="Start writing your Markdown content here..."
-                  value={markdownContent}
-                  onChange={handleMarkdownContentChange} // Use new handler for markdown content
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Supports LaTeX with $...$ and $$...$$, and code highlighting.
-                </p>
-              </div>
-            </div>
-            <div className="mt-6 flex space-x-4">
-              <Button onClick={handleSave} disabled={isSaving || !title || !markdownContent}>
-                {isSaving ? 'Saving...' : 'Save Content'}
+                className="w-full py-3 text-lg font-semibold bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg shadow-md transition-all duration-200 ease-in-out transform hover:scale-[1.01]"
+              >
+                New Empty File
               </Button>
-              {currentFilePath && (
-                <Button onClick={handleDelete} disabled={isDeleting} variant="destructive">
-                  {isDeleting ? 'Deleting...' : 'Delete Content'}
-                </Button>
-              )}
+            </div>
+
+            {/* Load Existing File */}
+            <div className="p-4 border border-border rounded-lg bg-secondary/20 shadow-inner">
+              <h3 className="text-xl font-semibold mb-4 text-secondary-foreground">Load Existing Content</h3>
+              <div className="max-h-64 overflow-y-auto border border-border rounded-md p-3 bg-background shadow-sm">
+                {fileList.length > 0 ? (
+                  <ul className="space-y-2">
+                    {fileList.map((file) => (
+                      <li key={file.path}>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start h-auto py-2 px-3 text-sm text-left text-foreground hover:bg-accent hover:text-accent-foreground rounded-md transition-colors duration-150"
+                          onClick={() => handleFileSelect(file.path)}
+                        >
+                          <span className="truncate">{file.path}</span>
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-center text-sm text-muted-foreground py-4">No existing files found.</p>
+                )}
+              </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          {/* Preview Section */}
-          <div>
-            <h2 className="text-xl font-semibold mb-3">Preview</h2>
-            <Card className="min-h-[700px] overflow-auto">
-              <CardContent className="p-4">
-                <MarkdownPreview markdown={markdownContent} />
-              </CardContent>
-            </Card>
+      {/* Editor Area */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Input Section */}
+        <div className="p-4 bg-card rounded-xl shadow-lg border border-border">
+          <h2 className="text-2xl font-semibold mb-5 text-card-foreground">Content Details</h2>
+          <div className="space-y-6">
+            <div>
+              <Label htmlFor="title" className="text-sm font-medium text-muted-foreground">Title</Label>
+              <Input
+                id="title"
+                placeholder="Enter content title"
+                value={title}
+                onChange={handleTitleChange}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="slug" className="text-sm font-medium text-muted-foreground">Slug (Auto-generated / Editable)</Label>
+              <Input
+                id="slug"
+                placeholder="content-slug"
+                value={slug}
+                onChange={handleSlugChange}
+                disabled={!title && !slug} // Disable if no title
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="author" className="text-sm font-medium text-muted-foreground">Author</Label>
+              <Input
+                id="author"
+                placeholder="e.g., John Doe"
+                value={author}
+                onChange={handleAuthorChange}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="description" className="text-sm font-medium text-muted-foreground">Description</Label>
+              <Input
+                id="description"
+                placeholder="A brief summary of the content"
+                value={description}
+                onChange={handleDescriptionChange}
+                className="mt-1"
+              />
+            </div>
+
+            {/* Blog Post Specific Fields (Conditional) */}
+            {contentBaseDir === 'posts' && (
+              <>
+                <Separator className="my-6 bg-border" />
+                <h3 className="text-xl font-semibold text-card-foreground">Blog Post Specific Front Matter</h3>
+                <div>
+                  <Label htmlFor="image" className="text-sm font-medium text-muted-foreground">Cover Image URL</Label>
+                  <Input
+                    id="image"
+                    placeholder="e.g., https://raw.githubusercontent.com/user/repo/branch/images/cover.jpg"
+                    value={image}
+                    onChange={handleImageChange}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="category" className="text-sm font-medium text-muted-foreground">Category</Label>
+                  <Input
+                    id="category"
+                    placeholder="e.g., Development, Design, Life"
+                    value={category}
+                    onChange={handleCategoryChange}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="tags" className="text-sm font-medium text-muted-foreground">Tags (comma-separated)</Label>
+                  <Input
+                    id="tags"
+                    placeholder="e.g., javascript, react, nextjs"
+                    value={tags}
+                    onChange={handleTagsChange}
+                    className="mt-1"
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Course Lesson Specific Fields (Conditional) */}
+            {contentBaseDir === 'courses' && (
+              <>
+                <Separator className="my-6 bg-border" />
+                <h3 className="text-xl font-semibold text-card-foreground">Course Lesson Specific Front Matter</h3>
+                <div>
+                  <Label htmlFor="lessonOrder" className="text-sm font-medium text-muted-foreground">Lesson Order (Number)</Label>
+                  <Input
+                    id="lessonOrder"
+                    type="number"
+                    placeholder="e.g., 1"
+                    value={lessonOrder}
+                    onChange={handleLessonOrderChange}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="duration" className="text-sm font-medium text-muted-foreground">Duration</Label>
+                  <Input
+                    id="duration"
+                    placeholder="e.g., 15 min, 1 hour"
+                    value={duration}
+                    onChange={handleDurationChange}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="videoUrl" className="text-sm font-medium text-muted-foreground">Video URL</Label>
+                  <Input
+                    id="videoUrl"
+                    placeholder="e.g., https://www.youtube.com/watch?v=..."
+                    value={videoUrl}
+                    onChange={handleVideoUrlChange}
+                    className="mt-1"
+                  />
+                </div>
+              </>
+            )}
+            {/* --- END NEW INPUTS --- */}
+            {/* Markdown Content (Common to both) */}
+            <div>
+              <Label htmlFor="markdownContent" className="text-sm font-medium text-muted-foreground">Markdown Content</Label>
+              <Textarea
+                id="markdownContent"
+                className="min-h-[400px] font-mono mt-1 border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-ring focus-visible:ring-offset-background"
+                placeholder="Start writing your Markdown content here..."
+                value={markdownContent}
+                onChange={handleMarkdownContentChange}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Supports LaTeX with $...$ and $$...$$, and code highlighting.
+              </p>
+            </div>
+          </div>
+          <div className="mt-8 flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+            <Button
+              onClick={handleSave}
+              disabled={isSaving || !title || !markdownContent}
+              className="w-full sm:w-auto py-3 text-lg font-semibold bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-md transition-all duration-200 ease-in-out transform hover:scale-[1.01]"
+            >
+              {isSaving ? 'Saving...' : 'Save Content'}
+            </Button>
+            {currentFilePath && (
+              <Button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                variant="destructive"
+                className="w-full sm:w-auto py-3 text-lg font-semibold rounded-lg shadow-md transition-all duration-200 ease-in-out transform hover:scale-[1.01]"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Content'}
+              </Button>
+            )}
           </div>
         </div>
+
+        {/* Preview Section */}
+        <div className="p-4 bg-card rounded-xl shadow-lg border border-border">
+          <h2 className="text-2xl font-semibold mb-5 text-card-foreground">Preview</h2>
+          <Card className="min-h-[700px] overflow-auto border border-border rounded-lg shadow-inner bg-background">
+            <CardContent className="p-6">
+              <MarkdownPreview markdown={markdownContent} />
+            </CardContent>
+          </Card>
+        </div>
       </div>
+    </div>
     );
   }
 
